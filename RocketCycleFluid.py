@@ -34,6 +34,9 @@ def reformat_CEA_mass_fractions(mass_fractions):
     # First remove the asterix in species names if present
     mass_fractions = {species.replace('*', ''): mf[1] for species, mf in mass_fractions.items()}
 
+    # Second remove any species with zero mass fraction
+    mass_fractions = {species: mf for species, mf in mass_fractions.items() if mf != 0.0}
+
     # Since some smaller mass fractions are not used, we need to make the dictionary consistent by changing the highest
     # mass fraction to be equal (1 - mf of all the other species)
     largest_species = max(mass_fractions, key=lambda species: mass_fractions[species])
