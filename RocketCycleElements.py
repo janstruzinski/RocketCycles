@@ -190,7 +190,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
 
     # Calculate specific work of the turbine
     specific_work = ((turbine_power / 1e3) / massflow) * (inlet_gas.MW / 1e3)   # kJ / mol
-    outlet_hs = inlet_gas.h0 - specific_work                                    # kJ / mol
+    outlet_hs = (inlet_gas.h0 / 1e3) - specific_work                                    # kJ / mol
 
     # Define a function which will be solved to find static temperature at the outlet that results in
     # the right work extraction
@@ -203,7 +203,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
         """
         outlet_gas = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
                                       temperature=outlet_Ts, type=inlet_gas.type, phase=inlet_gas.phase)
-        return outlet_hs - outlet_gas.h0    # kJ / mol
+        return outlet_hs - (outlet_gas.h0 / 1e3)    # kJ / mol
 
     # Solve the function above. Bisection algorithm will be again used for guaranteed convergence. The lower limit is
     # room temperature, the higher limit is inlet gas static temperature.
@@ -220,7 +220,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
 
     # Calculate gamma and calculate total-to-total pressure ratio. Gamma is calculated based on average specific heat
     # for the process
-    average_molar_Cp = ((inlet_gas.molar_Cp_frozen - outlet_gas.molar_Cp_frozen) /
+    average_molar_Cp = (((inlet_gas.h0 - outlet_gas.h0) / 1e3) /
                         (inlet_gas.Ts - outlet_gas.Ts))     # J / (K * mol)
     gamma_average = average_molar_Cp / (average_molar_Cp - inlet_gas.R)
 

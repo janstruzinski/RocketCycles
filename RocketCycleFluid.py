@@ -195,7 +195,7 @@ class RocketCycleFluid:
         """
 
         # Create lists to store the results
-        h0_list = []    # kJ / mol
+        h0_list = []    # kJ / (mol * kg)
         Cp_list = []    # J / (mol * K)
         MW_list = []    # g / mol
         CEA_card = ""
@@ -203,7 +203,7 @@ class RocketCycleFluid:
         # Iterate over species to retrieve their thermal properties
         for (name, mf) in zip(self.species, self.mass_fractions):
             species = nasaPoly.Species(name)
-            h0 = species.h_0(self.Ts)          # kJ / mol
+            h0 = species.h_0(self.Ts)          # kJ / (mol * kg)
             Cp = species.cp_0(self.Ts)         # J / (mol * K)
             MW = species.molecular_wt          # g / mol
             chemical_formula = species.chem_formula
@@ -222,13 +222,13 @@ class RocketCycleFluid:
         MW_array = np.array(MW_list)
 
         # Calculate molar fractions
-        mixture_MW = 1 / (np.sum(self.mass_fractions / MW_array))       # g / mol
+        mixture_MW = 1 / (np.sum(self.mass_fractions / MW_array))      # g / mol
         molar_fractions = mixture_MW * self.mass_fractions / MW_array
 
         # Calculate mixture thermal properties (ideal fluid assumption, frozen conditions)
         molar_Cp_mixture = np.sum(molar_fractions * Cp_array)    # J / (mol * K)
-        h0_mixture = np.sum(molar_fractions * h0_array)          # kJ / mol
-        mass_Cp_mixture = (molar_Cp_mixture / (self.MW / 1e3))   # J / (kg * K)
+        h0_mixture = np.sum(molar_fractions * h0_array)          # kJ / (mol * kg)
+        mass_Cp_mixture = (molar_Cp_mixture / (mixture_MW/ 1e3))   # J / (kg * K)
 
         # Return the results if mixture is not a gas
         if not self.phase == "gas":
