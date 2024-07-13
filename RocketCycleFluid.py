@@ -53,10 +53,10 @@ class RocketCycleFluid:
         """
         A class to store and calculate mixture thermophysical properties bases on NASA 9 polynomials
 
-        :param list or np.ndarray species: A list with strings representing species' CEA names.
-        :param list or np.ndarray mass_fractions: A list with floats representing species' mass fractions (from 0 to 1).
+        :param list species: A list with strings representing species' CEA names.
+        :param list mass_fractions: A list with floats representing species' mass fractions (from 0 to 1).
         :param float or int temperature: A float representing fluid static temperature (in K).
-        :param str type: "oxid" for oxidizer or "fuel" for fuel.
+        :param str type: "oxid" for oxidizer or "fuel" for fuel, "name" if neither of these
         :param str phase: String describing phase of Fluid. "gas" of gas-like properties or "liquid" for liquid-like
             properties. "gas"/"liquid" should be used also for supercritical phase, since at certain conditions even
             then it resembles one of these
@@ -172,7 +172,7 @@ class RocketCycleFluid:
                 PyFluid_Z_factors[species] = gas.compressibility
             # If species is not gas phase, change molar fraction of non gas species. Only graphite and water are
             # considered, because they are the only such species in preburner products.
-            elif species in ["C(gr), H2O(L)"]:
+            elif species in ["C(gr)", "H2O(L)"]:
                 non_gas_molar_fraction += value
 
         # Calculate molar fraction of gas species that are not in PyFluid. These are assumed to have compressibility
@@ -187,7 +187,7 @@ class RocketCycleFluid:
                                    + non_gas_molar_fraction * 0)
 
         # Calculate density based on ideal gas law and taking into account mixture compressibility factor
-        density = self.Ps * 1e5 * (self.MW / 1e3) / (mixture_compressibility * self.R * self.Ts)  # kg/m^3
+        density = self.Ps * 1e5 * (self.MW * 1e-3) / (mixture_compressibility * self.R * self.Ts)  # kg/m^3
         return density
 
     def get_mixture_thermal_properties(self):
@@ -217,9 +217,11 @@ class RocketCycleFluid:
             chemical_formula = re.sub(r"(\w)([A-Z])", r"\1   \2", chemical_formula)
             # Remove the zeros
             chemical_formula = re.sub('0.00', '', chemical_formula)
+            # Strip whitespaces at the end and the beginning
+            chemical_formula = chemical_formula.strip()
             # For each species create card string and add it to CEA card string
-            species_string = (f"{self.type} {name} {chemical_formula} wt%={100 * mf}\n"
-                              f"h,kj/mol={h0} t,k={self.Ts}\n")
+            species_string = (f"{self.type}   {name}   {chemical_formula}   wt%={100 * mf}\n"
+                              f"h,kj/mol={h0}   t,k={self.Ts}\n")
             CEA_card += species_string
             # Append arrays with retrieved results
             h0_list.append(h0)
@@ -267,7 +269,7 @@ class RocketCycleFluid:
         equilibrium_output = equilibrium.get_full_cea_output(Pc=self.Ps, pc_units="bar", output="si", short_output=1)
 
         # Now create a CEA object with SI units to get values expressed with them
-        equilibrium = CEA_Obj(propName=self.CEA_card, isp_units='sec', cstar_units='m/s',
+        equilibrium = CEA_Obj(propName="equilibrium card", isp_units='sec', cstar_units='m/s',
                               pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
                               enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
                               viscosity_units='millipoise', thermal_cond_units='W/cm-degC')
@@ -277,12 +279,10 @@ class RocketCycleFluid:
         equilibrium_mass_fractions = reformat_CEA_mass_fractions(equilibrium_mass_fractions)
 
         # Get static temperature
-        equilibrium_results = equilibrium.get_IvacCstrTc_ChmMwGam(Pc=self.Ps)
-        equilibrium_temperature = equilibrium_results[2]    # K
-        products_gamma = equilibrium_results[-1]
+        equilibrium_temperature = equilibrium.get_Tcomb(Pc=self.Ps)     # K
 
         # Get equilibrium heat capacity and viscosity
-        transport_properties = equilibrium.get_HeatCapacities(Pc=self.Ps)[0:2]
+        transport_properties = equilibrium.get_Chamber_Transport(Pc=self.Ps)[0:2]
         Cp_equilibrium = transport_properties[0] * 1e3      # J / (kg * K)
         viscosity = transport_properties[1]                 # milipoise
 
@@ -293,10 +293,6 @@ class RocketCycleFluid:
         equilibrium_fluid.Ps = self.Ps                          # bar
         equilibrium_fluid.viscosity = viscosity                 # milipoise
         equilibrium_fluid.mass_Cp_equilibrium = Cp_equilibrium  # J / (kg * K)
-
-        # Calculate total temperature and pressure
-        equilibrium_fluid.calculate_total_temperature()
-        equilibrium_fluid.calculate_total_from_static_pressure()
 
         # Return the new RocketCycleFluid and CEA full output
         return equilibrium_fluid, equilibrium_output
