@@ -1,3 +1,4 @@
+import RocketCycleElements
 from RocketCycleFluid import RocketCycleFluid, reformat_CEA_mass_fractions
 import RocketCycleElements as RocketCycle
 import rocketcea.cea_obj as rcea
@@ -83,7 +84,7 @@ class TestRocketCycleFluid(unittest.TestCase):
         # Create RocketCycleFluid object
         fluid = RocketCycleFluid(species=list(mass_fractions.keys()), mass_fractions=list(mass_fractions.values()),
                                  temperature=T_combustion, type="fuel", phase="gas")
-        fluid.Ps = 1        # bar
+        fluid.Ps = 1  # bar
         density = fluid.calculate_gas_density()
 
         np.testing.assert_allclose(density, CEA_density, rtol=1e-2)
@@ -104,10 +105,70 @@ class TestRocketCycleFluid(unittest.TestCase):
         # Get temperature of combustion from RocketCycleFluid
         fluid = RocketCycleFluid(species=["O2", "H2"], mass_fractions=[0.5, 0.5], temperature=298.15, type="name",
                                  phase="gas")
-        fluid.Ps = 1     # bar
+        fluid.Ps = 1  # bar
         equilibrium_fluid, equilibrium_output = fluid.equilibrate()
 
         # Compare temperatures
         np.testing.assert_allclose(equilibrium_fluid.Ts, T_combustion, rtol=1e-2)
 
 
+class TestRocketCycleElements(unittest.TestCase):
+    def test_calculate_state_after_pump(self):
+        """A function to test calculation of the state after pump function"""
+        # This will be done only for RocketEngineFluid, since for CoolProp it is very straightforward. We are going
+        # to assume some fictional thermophysical and compare the results with manual calculations.
+
+        # Calculate actual values
+        fluid = RocketCycleFluid(species=["H2O(L)"], mass_fractions=[1], temperature=298.15, type="fuel",
+                                 phase="liquid", liquid_elasticity=1.43 * 10 ** 9,
+                                 volumetric_expansion_coefficient=990 * 1e-6, density=940)
+        fluid.Pt = 3  # bar
+        fluid.Ps = fluid.Pt  # bar
+        fluid.mass_Cp_frozen = 1000  # J / (kg * K)
+        pumped_fluid, enthalpy_change = RocketCycleElements.calculate_state_after_pump(
+            fluid=fluid, fluid_object="RocketCycleFluid", delta_P=60, efficiency=0.5)
+
+        # Calculate desired values
+        outlet_density_isothermal = fluid.density / (1 - 60e5 / fluid.liquid_elasticity)  # kg / m^3
+        w_useful = (63e5 / outlet_density_isothermal) - (3e5 / fluid.density)  # J / kg
+        w_total = w_useful / 0.5  # J / kg
+        w_wasted = w_total - w_useful  # J / kg
+        T_outlet = fluid.Ts + w_wasted / fluid.mass_Cp_frozen  # K
+        outlet_density = outlet_density_isothermal / (
+                1 + (T_outlet - fluid.Ts) * fluid.volumetric_expansion_coefficient)
+
+        # Compare actual and desired values
+        np.testing.assert_allclose([pumped_fluid.Ts, pumped_fluid.Pt, enthalpy_change],
+                                   [T_outlet, 63, w_total])
+
+    def test_calculate_state_after_preburner(self):
+        """A function to test calculation of the state after preburner"""
+        # This will be done by comparing CEA output with the function output
+        # Get CEA results
+        preburner = CEA_Obj(oxName="LOX", fuelName="C3H8", isp_units='sec', cstar_units='m/s',
+                            pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                            enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                            viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=1.5)
+        T_combustion = preburner.get_Tcomb(Pc=600, MR=50)   # K
+        Cp_frozen = preburner.get_Chamber_Transport(Pc=600, MR=50, frozen=1)[0] * 1e3     # J / (kg * K)
+
+        # Get results from the function. CR above corresponds to the velocity of 223.293 m/s
+        LOX = RocketCycleFluid(species=["O2(L)"], mass_fractions=[1], temperature=90.17, type="oxid",
+                               phase="liquid", species_molar_Cp=[50.180])
+        Propane = RocketCycleFluid(species=["C3H8(L)"], mass_fractions=[1], temperature=231.08, type="fuel",
+                                   phase="liquid", species_molar_Cp=[92.974])
+        preburner_CEA_output, preburner_products = RocketCycleElements.calculate_state_after_preburner(
+            fuel=Propane, oxidizer=LOX, OF=50, preburner_inj_pressure=600, products_velocity=223.293)
+
+        # Compare the results
+        np.testing.assert_allclose([preburner_products.Ts, preburner_products.mass_Cp_frozen],
+                                   [T_combustion, Cp_frozen], rtol=1e-2)
+
+    def test_calculate_state_after_turbine(self):
+        ...
+
+    def test_calculate_state_after_cooling_channels(self):
+        ...
+
+    def test_calculate_combustion_chamber_performance(self):
+        ...
