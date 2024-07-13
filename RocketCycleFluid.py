@@ -49,7 +49,7 @@ def reformat_CEA_mass_fractions(mass_fractions):
 
 class RocketCycleFluid:
     def __init__(self, species, mass_fractions, temperature, type, phase, volumetric_expansion_coefficient=0,
-                 liquid_elasticity=0, density=None):
+                 liquid_elasticity=10**16, density=None, species_molar_Cp=None):
         """
         A class to store and calculate mixture thermophysical properties bases on NASA 9 polynomials
 
@@ -67,6 +67,10 @@ class RocketCycleFluid:
             a new density of the fluid after it passes the pump. Only for "liquid" phase, nominally set to 1.
         :param float or int density: An optional float to represent assigned fluid density (in kg/m^3). Only for
             "liquid" phase, for gas it can be calculated.
+        :param list species_molar_Cp: A list of molar heat capacities (in J/mol-K) for individual species needs to be
+         provided if there is any liquified gas, like O2(L), CH4(L), H2(L) or C3H8(L). This is because NASA 9
+         Polynomials do not provide them. For any species that are not liquified gases, corresponding entry in the list
+         can be anything, as Cp will be then obtained from NASA 9 Polynomials then.
         """
 
         # Assign properties
@@ -84,6 +88,13 @@ class RocketCycleFluid:
         self.Tt = None                      # K
         self.viscosity = None               # milipoise
         self.mass_Cp_equilibrium = None     # J / (kg * K)
+
+        # If a list of heat capacities for individual species was not provided, create a zero array instead of it.
+        # Otherwise, make it a property. This is done to handle situations in which NASA 9 Poly does not provide any Cp.
+        if species_molar_Cp is None:
+            self.species_molar_Cp = np.zeros(len(species))
+        else:
+            self.species_molar_Cp = species_molar_Cp
 
         # Generate CEA card, calculate enthalpy, Cp, gamma for ideal fluid (no enthalpy of mixing, frozen conditions)
         if self.phase == "gas":
@@ -205,10 +216,29 @@ class RocketCycleFluid:
         CEA_card = ""
 
         # Iterate over species to retrieve their thermal properties
-        for (name, mf) in zip(self.species, self.mass_fractions):
+        for (name, mf, Cp) in zip(self.species, self.mass_fractions, self.species_molar_Cp):
             species = nasaPoly.Species(name)
-            h0 = species.h_0(self.Ts)          # kJ / (mol * kg)
-            Cp = species.cp_0(self.Ts)         # J / (mol * K)
+            # Some of the liquified gases in NASA 9 polynomials are only able to return assigned enthalpy at boiling
+            # temperature. In this case, to calculate their new enthalpy at other temperature, Cp needs to be provided
+            # and used.
+            # First, if possible from NASA 9 polynomials, calculate enthalpy and Cp. This will overwrite Cp = 0.
+            if not species.T_ranges == []:
+                h0 = species.h_0(self.Ts) * 1e-3   # kJ / (mol * kg)
+                Cp = species.cp_0(self.Ts)         # J / (mol * K)
+            # Now, calculate enthalpy and Cp if it is not possible from NASA 9 Polynomials. This will keep Cp as is.
+            else:
+                # Get enthalpy of formation at boiling temperature
+                h0_formation = species.h_f_0 * 1e-3  # kJ/mol
+                # Now, find their boiling temperature. This can be done by getting raw data from NASA 9 Polynomials,
+                # and taking the first number in the second line
+                # Get data entry string
+                raw_data = species.raw_entry[0]
+                # Get second line
+                raw_data = raw_data.split("\n", 2)[2]
+                # Get the first number in the string and change it to float
+                T_boiling = float(re.search(r'\d+\.\d+', raw_data).group())     # K
+                # Calculate the new enthalpy
+                h0 = h0_formation + (self.Ts - T_boiling) * Cp * 1e-3   # kJ/mol
             MW = species.molecular_wt          # g / mol
             chemical_formula = species.chem_formula
             # Chemical formula in NASA Poly are a bit broken - sometimes there is no space delimiter
@@ -240,7 +270,7 @@ class RocketCycleFluid:
         # Calculate mixture thermal properties (ideal fluid assumption, frozen conditions)
         molar_Cp_mixture = np.sum(molar_fractions * Cp_array)    # J / (mol * K)
         h0_mixture = np.sum(molar_fractions * h0_array)          # kJ / (mol * kg)
-        mass_Cp_mixture = (molar_Cp_mixture / (mixture_MW/ 1e3))   # J / (kg * K)
+        mass_Cp_mixture = (molar_Cp_mixture / (mixture_MW * 1e-3))   # J / (kg * K)
 
         # Return the results if mixture is not a gas
         if not self.phase == "gas":
@@ -275,7 +305,7 @@ class RocketCycleFluid:
                               viscosity_units='millipoise', thermal_cond_units='W/cm-degC')
 
         # Get and reformat mass fractions
-        equilibrium_mass_fractions = equilibrium.get_SpeciesMassFractions(Pc=self.Ps, min_fraction=1e-3)[1]
+        equilibrium_mass_fractions = equilibrium.get_SpeciesMassFractions(Pc=self.Ps, min_fraction=1e-6)[1]
         equilibrium_mass_fractions = reformat_CEA_mass_fractions(equilibrium_mass_fractions)
 
         # Get static temperature
