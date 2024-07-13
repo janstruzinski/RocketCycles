@@ -17,9 +17,9 @@ def calculate_state_after_pump(fluid, fluid_object, delta_P, efficiency):
 
     # For PyFluid, a built-in function can be used.
     if fluid_object == "PyFluid":
-        old_enthalpy = fluid.enthalpy               # J / kg
+        old_enthalpy = fluid.enthalpy  # J / kg
         fluid.compression_to_pressure(pressure=fluid.pressure + delta_P * 1e5, isentropic_efficiency=efficiency)
-        w_total = fluid.enthalpy - old_enthalpy     # J / kg
+        w_total = fluid.enthalpy - old_enthalpy  # J / kg
         return fluid, w_total
 
     elif fluid_object == "RocketCycleFluid":
@@ -32,22 +32,25 @@ def calculate_state_after_pump(fluid, fluid_object, delta_P, efficiency):
         delta_P *= 1e5  # change bar to Pa
         outlet_pressure = inlet_pressure + delta_P  # Pa
         outlet_density_isothermal = (fluid.density /
-                                     (1 - (outlet_pressure - inlet_pressure) / fluid.liquid_elasticity))    # kg/m^3
-        w_useful = (outlet_pressure / outlet_density_isothermal) - (inlet_pressure / fluid.density)         # J / kg
-        w_total = w_useful / efficiency     # J / kg
+                                     (1 - ((outlet_pressure - inlet_pressure) / fluid.liquid_elasticity)))  # kg/m^3
+        w_useful = (outlet_pressure / outlet_density_isothermal) - (inlet_pressure / fluid.density)  # J / kg
+        w_total = w_useful / efficiency  # J / kg
 
         # Now calculate heating of the liquid and new density (due to new pressure). For such small temperature
         # rise like in a pumped fluid, Cp can be assumed to be constant
-        w_wasted = w_total - w_useful               # J / kg
-        delta_T = w_wasted / fluid.mass_Cp_frozen   # K
-        outlet_temperature = fluid.Ts + delta_T     # K
+        w_wasted = w_total - w_useful  # J / kg
+        delta_T = w_wasted / fluid.mass_Cp_frozen  # K
+        outlet_temperature = fluid.Ts + delta_T  # K
         outlet_density = (outlet_density_isothermal /
-                          (1 - (outlet_temperature - fluid.Ts) / fluid.volumetric_expansion_coefficient))   # kg / m^3
+                          (1 + ((outlet_temperature - fluid.Ts) * fluid.volumetric_expansion_coefficient)))  # kg / m^3
 
         # Assign new properties to the fluid, return the results
-        fluid.density = outlet_density      # kg / m^3
-        fluid.Pt = outlet_pressure / 1e5    # bar
-        fluid.Ts = outlet_temperature       # K
+        fluid = RocketCycleFluid(species=fluid.species, mass_fractions=fluid.mass_fractions,
+                                 temperature=outlet_temperature, type=fluid.type, phase="liquid",
+                                 volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
+                                 liquid_elasticity=fluid.liquid_elasticity, density=outlet_density)
+        fluid.Pt = outlet_pressure / 1e5  # bar
+        fluid.Ps = fluid.Pt  # bar
 
         return fluid, w_total
 
@@ -92,13 +95,13 @@ def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, 
         :return: A residual between obtained and desired velocity at the end of preburner (in m/s)
         """
         preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
-        a = preburner.get_SonicVelocities(Pc=pressure_preburner_inj_psia, MR=OF)[0]  # m/s
+        a = preburner.get_SonicVelocities(Pc=pressure_preburner_inj_psia, MR=OF)[0] * 0.3048  # m/s
         M = preburner.get_Chamber_MachNumber(Pc=pressure_preburner_inj_psia, MR=OF)
-        return M * a - products_velocity    # m/s
+        return M * a - products_velocity  # m/s
 
-    # Solve the function for CR. Use bracketing method from FR 1 to 15. 1 is the lower physical limit for CR, and
-    # 15 should correspond to a very slow turbine inlet velocity, so should be able to always converge.
-    CR = opt.toms748(calc_velocity_residual, a=1, b=15, maxiter=1000, rtol=1e-04, xtol=1e-04)[0]
+    # Solve the function for CR. Use bracketing method from FR 1 to 5. 1 is the lower physical limit for CR.
+    # 10 should correspond to a very slow turbine inlet velocity, so should be able to always converge.
+    CR = opt.toms748(calc_velocity_residual, a=1, b=10, maxiter=1000)
 
     # Get the full CEA output, the combustion products' composition, plenum pressure, temperature and specific heat
     # in the combustor. To get full CEA output as a string, CEA object that is not a SI units wrapper needs to be
@@ -114,19 +117,19 @@ def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, 
                         thermal_cond_units='W/cm-degC', fac_CR=CR)
 
     # Get temperature in the preburner and gamma of the products
-    preburner_temperature = preburner.get_IvacCstrTc_ChmMwGam(Pc=preburner_inj_pressure, MR=OF)     # K
+    preburner_temperature = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
 
     # Get preburner pressure at its end
     preburner_plenum_pressure = (preburner_inj_pressure /
                                  preburner.get_Pinj_over_Pcomb(Pc=preburner_inj_pressure, MR=OF))  # bar
 
     # Get preburner heat capacity and visocity. Heat capacity is equilibrium, not frozen heat capacity.
-    transport_properties = preburner.get_HeatCapacities(Pc=preburner_inj_pressure, MR=OF)[0:2]
-    products_Cp_equilibrium = transport_properties[0] * 1e3     # J / (K * kg)
-    viscosity = transport_properties[1]                         # milipoise
+    transport_properties = preburner.get_Chamber_Transport(Pc=preburner_inj_pressure, MR=OF)[0:2]
+    products_Cp_equilibrium = transport_properties[0] * 1e3  # J / (K * kg)
+    viscosity = transport_properties[1]  # milipoise
 
     # Get preburner mass fractions
-    products_mass_fractions = preburner.get_SpeciesMassFractions(Pc=preburner_inj_pressure, MR=OF, min_fraction=1e-3)[1]
+    products_mass_fractions = preburner.get_SpeciesMassFractions(Pc=preburner_inj_pressure, MR=OF, min_fraction=1e-6)[1]
     products_mass_fractions = reformat_CEA_mass_fractions(products_mass_fractions)
 
     # Create a RocketCycleFluid object to store the results. Determine if they are fuel or oxygen rich.
@@ -137,12 +140,12 @@ def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, 
     preburner_products = RocketCycleFluid(species=list(products_mass_fractions.keys()),
                                           mass_fractions=list(products_mass_fractions.values()),
                                           temperature=preburner_temperature, type=products_type, phase="gas")
-    preburner_products.Ps = preburner_plenum_pressure                   # bar
-    preburner_products.mass_Cp_equilibrium = products_Cp_equilibrium    # J / (kg * K)
-    preburner_products.viscosity = viscosity                            # milipoise
+    preburner_products.Ps = preburner_plenum_pressure  # bar
+    preburner_products.mass_Cp_equilibrium = products_Cp_equilibrium  # J / (kg * K)
+    preburner_products.viscosity = viscosity  # milipoise
 
     # Calculate total temperature and pressure
-    preburner_products.velocity = products_velocity     # m/s
+    preburner_products.velocity = products_velocity  # m/s
     preburner_products.calculate_total_temperature()
     preburner_products.calculate_total_from_static_pressure()
 
@@ -187,8 +190,8 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     # expansion process in the turbine is based on average specific heat for it (as it depends on temperature).
 
     # Calculate specific work of the turbine
-    specific_work = ((turbine_power * 1e-3) / massflow) * (inlet_gas.MW * 1e-3)   # kJ / mol
-    outlet_hs = (inlet_gas.h0 * 1e-3) - specific_work                                    # kJ / mol
+    specific_work = ((turbine_power * 1e-3) / massflow) * (inlet_gas.MW * 1e-3)  # kJ / mol
+    outlet_hs = (inlet_gas.h0 * 1e-3) - specific_work  # kJ / mol
 
     # Define a function which will be solved to find static temperature at the outlet that results in
     # the right work extraction
@@ -201,12 +204,12 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
         """
         outlet_gas = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
                                       temperature=outlet_Ts, type=inlet_gas.type, phase=inlet_gas.phase)
-        return outlet_hs - (outlet_gas.h0 * 1e-3)    # kJ / mol
+        return outlet_hs - (outlet_gas.h0 * 1e-3)  # kJ / mol
 
     # Solve the function above. Bisection algorithm will be again used for guaranteed convergence. The lower limit is
     # room temperature, the higher limit is inlet gas static temperature.
     Ts = opt.toms748(calc_enthalpy_residual, a=288.15, b=inlet_gas.Ts, maxiter=1000, rtol=1e-04,
-                     xtol=1e-04)[0]  # K
+                     xtol=1e-04)  # K
 
     # Define gas at the outlet of the current stage
     outlet_gas = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
@@ -219,7 +222,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     # Calculate gamma and calculate total-to-total pressure ratio. Gamma is calculated based on average specific heat
     # for the process
     average_molar_Cp = (((inlet_gas.h0 - outlet_gas.h0) * 1e-3) /
-                        (inlet_gas.Ts - outlet_gas.Ts))     # J / (K * mol)
+                        (inlet_gas.Ts - outlet_gas.Ts))  # J / (K * mol)
     gamma_average = average_molar_Cp / (average_molar_Cp - inlet_gas.R)
 
     # Calculate pressure ratio
@@ -228,7 +231,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
 
     # Calculate pressures at the outlet. This time use gamma at outlet, as static to
     # total properties are isentropic process at that location (and not across the turbine).
-    outlet_gas.Pt = inlet_gas.Pt / beta_tt      # bar
+    outlet_gas.Pt = inlet_gas.Pt / beta_tt  # bar
     outlet_gas.calculate_static_from_total_pressure()
 
     # After the turbine outlet, perform equilibrium
@@ -253,7 +256,7 @@ def calculate_state_after_cooling_channels(fluid, fluid_object, mdot_coolant, md
     """
 
     # First calculate outlet massflow
-    mdot_outlet = mdot_coolant - mdot_film      # kg / s
+    mdot_outlet = mdot_coolant - mdot_film  # kg / s
 
     # If PyFluids' Fluid is used, object method can be used
     if fluid_object == "PyFluid":
@@ -268,7 +271,7 @@ def calculate_state_after_cooling_channels(fluid, fluid_object, mdot_coolant, md
                                  temperature=fluid.Ts + temperature_rise, type=fluid.type, phase="liquid",
                                  volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
                                  liquid_elasticity=fluid.liquid_elasticity)
-        fluid.Ps = new_Ps   # bar
+        fluid.Ps = new_Ps  # bar
         return fluid, mdot_outlet
 
 
@@ -289,7 +292,7 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     """
 
     # Get total massflow and OF
-    mdot_total = mdot_oxidizer + mdot_fuel      # kg / s
+    mdot_total = mdot_oxidizer + mdot_fuel  # kg / s
     OF = mdot_oxidizer / mdot_fuel
 
     # Retrieve cards and add them to CEA
@@ -307,17 +310,15 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
                  density_units='kg/m^3', specific_heat_units='kJ/kg-K', viscosity_units='millipoise',
                  thermal_cond_units='W/cm-degC', fac_CR=CR)
     (IspVac, Cstar, Tcomb) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)
-    CC_plenum_pressure = CC_pressure_at_injector / CC.get_Pinj_over_Pcomb(Pc=CC_pressure_at_injector, MR=OF)    # bar
+    CC_plenum_pressure = CC_pressure_at_injector / CC.get_Pinj_over_Pcomb(Pc=CC_pressure_at_injector, MR=OF)  # bar
 
     # Get throat and exit area
-    A_t = Cstar * mdot_total / (CC_plenum_pressure * 1e5)   # m^2
-    A_e = A_t * eps                                         # m^2
+    A_t = Cstar * mdot_total / (CC_plenum_pressure * 1e5)  # m^2
+    A_e = A_t * eps  # m^2
 
     # Get vacuum thrust, sea level thrust and Isp
-    ThrustVac = IspVac * 9.80665 * mdot_total       # N
-    ThrustSea = ThrustVac - 1.01325 * 1e5 * A_e     # N
-    IspSea = ThrustSea / (mdot_total * 9.80665)     # s
+    ThrustVac = IspVac * 9.80665 * mdot_total  # N
+    ThrustSea = ThrustVac - 1.01325 * 1e5 * A_e  # N
+    IspSea = ThrustSea / (mdot_total * 9.80665)  # s
 
-    return CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac/1e3, ThrustSea/1e3, A_t, A_e
-
-
+    return CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e
