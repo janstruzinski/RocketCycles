@@ -4,6 +4,7 @@ import nasaPoly
 import numpy as np
 import pyfluids
 import warnings
+import re
 
 
 def PyFluid_to_CEA_fluid(fluid, CEA_name, type, phase):
@@ -94,7 +95,7 @@ class RocketCycleFluid:
             self.volumetric_expansion_coefficient = volumetric_expansion_coefficient
             self.liquid_elasticity = liquid_elasticity
             self.density = density
-            self.CEA_card, self.h0, self.molar_Cp_frozen, self.mass_Cp_frozen, self.MW, self.rho = (
+            self.CEA_card, self.h0, self.molar_Cp_frozen, self.mass_Cp_frozen, self.MW, self.molar_fractions = (
                 self.get_mixture_thermal_properties())
 
     def check_gas_phase(self):
@@ -210,6 +211,12 @@ class RocketCycleFluid:
             Cp = species.cp_0(self.Ts)         # J / (mol * K)
             MW = species.molecular_wt          # g / mol
             chemical_formula = species.chem_formula
+            # Chemical formula in NASA Poly are a bit broken - sometimes there is no space delimiter
+            # before the capital letter and there are multiple zeros at the end of formula. This needs to be fixed
+            # Add the space
+            chemical_formula = re.sub(r"(\w)([A-Z])", r"\1   \2", chemical_formula)
+            # Remove the zeros
+            chemical_formula = re.sub('0.00', '', chemical_formula)
             # For each species create card string and add it to CEA card string
             species_string = (f"{self.type} {name} {chemical_formula} wt%={100 * mf}\n"
                               f"h,kj/mol={h0} t,k={self.Ts}\n")
@@ -235,7 +242,7 @@ class RocketCycleFluid:
 
         # Return the results if mixture is not a gas
         if not self.phase == "gas":
-            return CEA_card, h0_mixture, molar_Cp_mixture, mass_Cp_mixture, mixture_MW
+            return CEA_card, h0_mixture, molar_Cp_mixture, mass_Cp_mixture, mixture_MW, molar_fractions
 
         # If it is a gas, calculate thermal properties specific to gases and return the results
         if self.phase == "gas":
