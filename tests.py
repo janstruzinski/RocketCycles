@@ -29,7 +29,7 @@ class TestRocketCycleFluid(unittest.TestCase):
         mass_fractions = reformat_CEA_mass_fractions(mass_fractions)
         fluid = RocketCycleFluid(species=list(mass_fractions.keys()), mass_fractions=list(mass_fractions.values()),
                                  temperature=T, type="fuel", phase="gas")
-        h0 = (fluid.h0 * 1e-3) / (fluid.MW * 1e-3)
+        h0 = fluid.h0 / (fluid.MW * 1e-3)  # kJ / mol
         np.testing.assert_allclose([fluid.mass_Cp_frozen, h0], [cea_Cp_frozen, cea_h0], rtol=1e-2)
 
     def test_total_properties_functions(self):
@@ -138,8 +138,8 @@ class TestRocketCycleElements(unittest.TestCase):
                 1 + (T_outlet - fluid.Ts) * fluid.volumetric_expansion_coefficient)
 
         # Compare actual and desired values
-        np.testing.assert_allclose([pumped_fluid.Ts, pumped_fluid.Pt, enthalpy_change],
-                                   [T_outlet, 63, w_total])
+        np.testing.assert_allclose([pumped_fluid.Ts, pumped_fluid.Pt, enthalpy_change, pumped_fluid.density],
+                                   [T_outlet, 63, w_total, outlet_density])
 
     def test_calculate_state_after_preburner(self):
         """A function to test calculation of the state after preburner"""
@@ -149,8 +149,8 @@ class TestRocketCycleElements(unittest.TestCase):
                             pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
                             enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
                             viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=1.5)
-        T_combustion = preburner.get_Tcomb(Pc=600, MR=50)   # K
-        Cp_frozen = preburner.get_Chamber_Transport(Pc=600, MR=50, frozen=1)[0] * 1e3     # J / (kg * K)
+        T_combustion = preburner.get_Tcomb(Pc=600, MR=50)  # K
+        Cp_frozen = preburner.get_Chamber_Transport(Pc=600, MR=50, frozen=1)[0] * 1e3  # J / (kg * K)
 
         # Get results from the function. CR above corresponds to the velocity of 223.293 m/s
         LOX = RocketCycleFluid(species=["O2(L)"], mass_fractions=[1], temperature=90.17, type="oxid",
@@ -165,7 +165,23 @@ class TestRocketCycleElements(unittest.TestCase):
                                    [T_combustion, Cp_frozen], rtol=1e-2)
 
     def test_calculate_state_after_turbine(self):
-        ...
+        """A function to test calculation of the state after turbine"""
+        # This will be done by comparing the difference in enthalpies between inlet and outlet gas.
+        # Get the result of the calculations
+        inlet_gas = RocketCycleFluid(species=["CH4"], mass_fractions=[1], temperature=800, type="fuel", phase="gas")
+        inlet_gas.velocity = 223.293
+        inlet_gas.calculate_total_temperature()
+        inlet_gas.Ps = 600      # bar
+        inlet_gas.calculate_total_from_static_pressure()
+        beta_tt, outlet_gas, equilibrium_gas, equilibrium_output = (
+            RocketCycleElements.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
+                                                              turbine_polytropic_efficiency=0.7, inlet_gas=inlet_gas,
+                                                              turbine_axial_velocity=223.293))
+        actual_w_specific = outlet_gas.h0 - inlet_gas.h0    # kJ / mol
+        # Calculate manually the desired enthalpy difference
+        desired_w_specific = -(37e6 * 1e-3 / 149) * (16.04246 * 1e-3)   # kJ / mol
+
+        np.testing.assert_allclose(actual_w_specific, desired_w_specific)
 
     def test_calculate_state_after_cooling_channels(self):
         ...
