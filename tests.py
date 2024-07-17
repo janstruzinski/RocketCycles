@@ -167,24 +167,75 @@ class TestRocketCycleElements(unittest.TestCase):
     def test_calculate_state_after_turbine(self):
         """A function to test calculation of the state after turbine"""
         # This will be done by comparing the difference in enthalpies between inlet and outlet gas.
+
         # Get the result of the calculations
         inlet_gas = RocketCycleFluid(species=["CH4"], mass_fractions=[1], temperature=800, type="fuel", phase="gas")
         inlet_gas.velocity = 223.293
         inlet_gas.calculate_total_temperature()
-        inlet_gas.Ps = 600      # bar
+        inlet_gas.Ps = 600  # bar
         inlet_gas.calculate_total_from_static_pressure()
         beta_tt, outlet_gas, equilibrium_gas, equilibrium_output = (
             RocketCycleElements.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
-                                                              turbine_polytropic_efficiency=0.7, inlet_gas=inlet_gas,
+                                                              turbine_polytropic_efficiency=0.85, inlet_gas=inlet_gas,
                                                               turbine_axial_velocity=223.293))
-        actual_w_specific = outlet_gas.h0 - inlet_gas.h0    # kJ / mol
-        # Calculate manually the desired enthalpy difference
-        desired_w_specific = -(37e6 * 1e-3 / 149) * (16.04246 * 1e-3)   # kJ / mol
+        actual_w_specific = outlet_gas.h0 - inlet_gas.h0  # kJ / mol
 
+        # Calculate manually the desired enthalpy difference
+        desired_w_specific = -(37e6 * 1e-3 / 149) * (16.04246 * 1e-3)  # kJ / mol
+
+        # Compare the results
         np.testing.assert_allclose(actual_w_specific, desired_w_specific)
 
     def test_calculate_state_after_cooling_channels(self):
-        ...
+        """A function to test calculation of the state after cooling channels."""
+        # This will be simply done by checking if the temperature and massflows are in order.
+        coolant = RocketCycleFluid(species=["CH4(L)"], mass_fractions=[1], temperature=91, type="fuel", phase="liquid",
+                                   species_molar_Cp=[54.037])
+        coolant.Ps = 800  # bar
+        coolant.Pt = 800  # bar
+
+        # Get fluid after cooling channels
+        coolant, mdot = RocketCycleElements.calculate_state_after_cooling_channels(
+            fluid=coolant, fluid_object="RocketCycleFluid", mdot_coolant=149, mdot_film=20, pressure_drop=150,
+            temperature_rise=100)
+
+        # Compare the results
+        np.testing.assert_allclose([mdot, coolant.Ps, coolant.Ts], [129, 650, 191])
 
     def test_calculate_combustion_chamber_performance(self):
-        ...
+        """A function to test the calculation of CC performance"""
+        # This will be done by comparing the results from the function and CEA
+        fuel = RocketCycleFluid(species=["CH4(L)"], mass_fractions=[1], temperature=111.66, type="fuel", phase="liquid",
+                                species_molar_Cp=[54.037])
+        oxidizer = RocketCycleFluid(species=["O2(L)"], mass_fractions=[1], temperature=90.18, type="oxidizer",
+                                    phase="liquid", species_molar_Cp=[54.361])
+        # Get propellant cards and add them to CEA
+        rcea.add_new_fuel("fuel_card", card_str=fuel.CEA_card)
+        rcea.add_new_oxidizer("oxidizer_card", card_str=oxidizer.CEA_card)
+        # Make analysis and get desired values
+        CC = CEA_Obj(oxName="oxidizer_card", fuelName="fuel_card", isp_units='sec', cstar_units='m/s',
+                     pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                     enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                     viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=2.5)
+        mdot_fuel = 100
+        mdot_oxidizer = 400
+        desired_IspVac, desired_C_star, desired_T_comb = CC.get_IvacCstrTc(Pc=300, MR=4, eps=100)
+        CC_plenum_pressure = 300e5 / CC.get_Pinj_over_Pcomb(Pc=300, MR=4)  # Pa
+        desired_A_t = (mdot_fuel + mdot_oxidizer) * desired_C_star / CC_plenum_pressure
+        desired_A_e = 100 * desired_A_t
+        desired_T_vac = desired_IspVac * 9.80665 * (mdot_fuel + mdot_oxidizer)
+        desired_T_sea = desired_T_vac - desired_A_e * 1.01325e5
+        desired_IspSea = desired_T_sea / ((mdot_fuel + mdot_oxidizer) * 9.80665)
+
+        # Get actual values
+        CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e = (
+            RocketCycleElements.calculate_combustion_chamber_performance(
+                mdot_oxidizer=400, mdot_fuel=100, oxidizer=oxidizer, fuel=fuel, CC_pressure_at_injector=300, CR=2.5,
+                eps=100))
+
+        # Compare the results
+        np.testing.assert_allclose([IspVac, IspSea, ThrustVac, ThrustSea], [desired_IspVac, desired_IspSea,
+                                                                            desired_T_vac / 1e3, desired_T_sea / 1e3])
+
+
+
