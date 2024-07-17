@@ -271,6 +271,8 @@ def calculate_state_after_cooling_channels(fluid, fluid_object, mdot_coolant, md
                                  volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
                                  liquid_elasticity=fluid.liquid_elasticity)
         fluid.Ps = new_Ps  # bar
+        # Dynamic head is small, so total pressure is the same as the static one
+        fluid.Pt = new_Ps  # bar
         return fluid, mdot_outlet
 
 
