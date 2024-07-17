@@ -223,7 +223,7 @@ class RocketCycleFluid:
             # and used.
             # First, if possible from NASA 9 polynomials, calculate enthalpy and Cp. This will overwrite Cp = 0.
             if not species.T_ranges == []:
-                h0 = species.h_0(self.Ts) * 1e-3   # kJ / (mol * kg)
+                h0 = species.h_0(self.Ts) * 1e-3   # kJ / mol
                 Cp = species.cp_0(self.Ts)         # J / (mol * K)
             # Now, calculate enthalpy and Cp if it is not possible from NASA 9 Polynomials. This will keep Cp as is.
             else:
