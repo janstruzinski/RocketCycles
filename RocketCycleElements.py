@@ -4,55 +4,62 @@ import scipy.optimize as opt
 from RocketCycleFluid import RocketCycleFluid, reformat_CEA_mass_fractions
 
 
-def calculate_state_after_pump(fluid, fluid_object, delta_P, efficiency):
+def calculate_state_after_pump_for_PyFluids(fluid, delta_P, efficiency):
+    """A function to calculate the state of the propellant after it passes the pump based on the pressure change and
+        pump efficiency.
+
+        :param pyfluids.Fluid fluid: PyFluids' Fluid object
+        :param float or int delta_P: pressure increase across the pump (in bar)
+        :param float or int efficiency: isentropic efficiency of the pump (-)
+        :return: a new fluid class after compression process, specific work required
+        """
+
+    # For PyFluid, a built-in function can be used.
+    old_enthalpy = fluid.enthalpy  # J / kg
+    fluid.compression_to_pressure(pressure=fluid.pressure + delta_P * 1e5, isentropic_efficiency=efficiency)
+    w_total = fluid.enthalpy - old_enthalpy  # J / kg
+    return fluid, w_total
+
+
+def calculate_state_after_pump(fluid, delta_P, efficiency):
     """A function to calculate the state of the propellant after it passes the pump based on the pressure change and
     pump efficiency.
 
-    :param pyfluids.Fluid or RocketCycleFluid fluid: PyFluids' Fluid or RocketCycleFluid object
-    :param str fluid_object: a string "PyFluid" or "RocketEngineFluid" indicating fluid object used
+    :param RocketCycleFluid fluid: RocketCycleFluid object
     :param float or int delta_P: pressure increase across the pump (in bar)
     :param float or int efficiency: isentropic efficiency of the pump (-)
     :return: a new fluid class after compression process, specific work required
     """
+    # The process is divided into two paths. The first is the isothermal compression due to pressure change. The
+    # second one is isobaric heating (due to pump inefficiency). This can be done as liquid state only depends on
+    # the final state parameters (pressure and temperature), which stay the same regardless of path taken.
 
-    # For PyFluid, a built-in function can be used.
-    if fluid_object == "PyFluid":
-        old_enthalpy = fluid.enthalpy  # J / kg
-        fluid.compression_to_pressure(pressure=fluid.pressure + delta_P * 1e5, isentropic_efficiency=efficiency)
-        w_total = fluid.enthalpy - old_enthalpy  # J / kg
-        return fluid, w_total
+    # First isothermal compression. Calculate new density at the outlet (due to compression) and the specific work.
+    inlet_pressure = fluid.Pt * 1e5  # change bar to Pa; total pressure used to take into account fluid velocity
+    delta_P *= 1e5  # change bar to Pa
+    outlet_pressure = inlet_pressure + delta_P  # Pa
+    outlet_density_isothermal = (fluid.density /
+                                 (1 - ((outlet_pressure - inlet_pressure) / fluid.liquid_elasticity)))  # kg/m^3
+    w_useful = (outlet_pressure / outlet_density_isothermal) - (inlet_pressure / fluid.density)  # J / kg
+    w_total = w_useful / efficiency  # J / kg
 
-    elif fluid_object == "RocketCycleFluid":
-        # The process is divided into two paths. The first is the isothermal compression due to pressure change. The
-        # second one is isobaric heating (due to pump inefficiency). This can be done as liquid state only depends on
-        # the final state parameters (pressure and temperature), which stay the same regardless of path taken.
+    # Now calculate heating of the liquid and new density (due to new pressure). For such small temperature
+    # rise like in a pumped fluid, Cp can be assumed to be constant
+    w_wasted = w_total - w_useful  # J / kg
+    delta_T = w_wasted / fluid.mass_Cp_frozen  # K
+    outlet_temperature = fluid.Ts + delta_T  # K
+    outlet_density = (outlet_density_isothermal /
+                      (1 + ((outlet_temperature - fluid.Ts) * fluid.volumetric_expansion_coefficient)))  # kg / m^3
 
-        # First isothermal compression. Calculate new density at the outlet (due to compression) and the specific work.
-        inlet_pressure = fluid.Pt * 1e5  # change bar to Pa; total pressure used to take into account fluid velocity
-        delta_P *= 1e5  # change bar to Pa
-        outlet_pressure = inlet_pressure + delta_P  # Pa
-        outlet_density_isothermal = (fluid.density /
-                                     (1 - ((outlet_pressure - inlet_pressure) / fluid.liquid_elasticity)))  # kg/m^3
-        w_useful = (outlet_pressure / outlet_density_isothermal) - (inlet_pressure / fluid.density)  # J / kg
-        w_total = w_useful / efficiency  # J / kg
+    # Assign new properties to the fluid, return the results
+    fluid = RocketCycleFluid(species=fluid.species, mass_fractions=fluid.mass_fractions,
+                             temperature=outlet_temperature, type=fluid.type, phase="liquid",
+                             volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
+                             liquid_elasticity=fluid.liquid_elasticity, density=outlet_density)
+    fluid.Pt = outlet_pressure / 1e5  # bar
+    fluid.Ps = fluid.Pt  # bar
 
-        # Now calculate heating of the liquid and new density (due to new pressure). For such small temperature
-        # rise like in a pumped fluid, Cp can be assumed to be constant
-        w_wasted = w_total - w_useful  # J / kg
-        delta_T = w_wasted / fluid.mass_Cp_frozen  # K
-        outlet_temperature = fluid.Ts + delta_T  # K
-        outlet_density = (outlet_density_isothermal /
-                          (1 + ((outlet_temperature - fluid.Ts) * fluid.volumetric_expansion_coefficient)))  # kg / m^3
-
-        # Assign new properties to the fluid, return the results
-        fluid = RocketCycleFluid(species=fluid.species, mass_fractions=fluid.mass_fractions,
-                                 temperature=outlet_temperature, type=fluid.type, phase="liquid",
-                                 volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
-                                 liquid_elasticity=fluid.liquid_elasticity, density=outlet_density)
-        fluid.Pt = outlet_pressure / 1e5  # bar
-        fluid.Ps = fluid.Pt  # bar
-
-        return fluid, w_total
+    return fluid, w_total
 
 
 def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, products_velocity):
@@ -240,12 +247,11 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     return beta_tt, outlet_gas, equilibrium_gas, equilibrium_output
 
 
-def calculate_state_after_cooling_channels(fluid, fluid_object, mdot_coolant, mdot_film, pressure_drop,
-                                           temperature_rise):
+def calculate_state_after_cooling_channels_for_Pyfluids(fluid, mdot_coolant, mdot_film, pressure_drop,
+                                                        temperature_rise):
     """A function to calculate the state of the coolant propellant after it passes through the cooling channels.
 
-    :param pyfluids.Fluid or RocketCycleFluid fluid: An object representing cooling fluid
-    :param str fluid_object: A string indicating whether PyFluids'Fluid or RocketCycleFluid is used
+    :param pyfluids.Fluid fluid: An object representing cooling fluid
     :param float or int mdot_coolant: Inlet coolant massflow (in kg/s)
     :param float or int mdot_film: Film cooling massflow (in kg/s)
     :param float or int pressure_drop: Pressure drop (in bar) across cooling channels
@@ -257,23 +263,38 @@ def calculate_state_after_cooling_channels(fluid, fluid_object, mdot_coolant, md
     # First calculate outlet massflow
     mdot_outlet = mdot_coolant - mdot_film  # kg / s
 
-    # If PyFluids' Fluid is used, object method can be used
-    if fluid_object == "PyFluid":
-        fluid.heating_to_temperature(temperature=fluid.temperature + temperature_rise,
-                                     pressure_drop=pressure_drop * 1e5)
-        return fluid, mdot_outlet
+    # For PyFluids' Fluid, object method can be used
+    fluid.heating_to_temperature(temperature=fluid.temperature + temperature_rise,
+                                 pressure_drop=pressure_drop * 1e5)
+    return fluid, mdot_outlet
 
-    # If RocketCycleFluid is used, create a new object with new temperature and pressure.
-    elif fluid_object == "RocketCycleFluid":
-        new_Ps = fluid.Ps - pressure_drop
-        fluid = RocketCycleFluid(species=fluid.species, mass_fractions=fluid.mass_fractions,
-                                 temperature=fluid.Ts + temperature_rise, type=fluid.type, phase="liquid",
-                                 volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
-                                 liquid_elasticity=fluid.liquid_elasticity)
-        fluid.Ps = new_Ps  # bar
-        # Dynamic head is small, so total pressure is the same as the static one
-        fluid.Pt = new_Ps  # bar
-        return fluid, mdot_outlet
+
+def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, pressure_drop,
+                                           temperature_rise):
+    """A function to calculate the state of the coolant propellant after it passes through the cooling channels.
+
+    :param RocketCycleFluid fluid: An object representing cooling fluid
+    :param float or int mdot_coolant: Inlet coolant massflow (in kg/s)
+    :param float or int mdot_film: Film cooling massflow (in kg/s)
+    :param float or int pressure_drop: Pressure drop (in bar) across cooling channels
+    :param float or int temperature_rise: Temperature rise (in K) across cooling channels
+
+    :return: Object representing outlet fluid, outlet massflow (in kg/s)
+    """
+
+    # First calculate outlet massflow
+    mdot_outlet = mdot_coolant - mdot_film  # kg / s
+
+    # Create a new object with new temperature and pressure.
+    new_Ps = fluid.Ps - pressure_drop
+    fluid = RocketCycleFluid(species=fluid.species, mass_fractions=fluid.mass_fractions,
+                             temperature=fluid.Ts + temperature_rise, type=fluid.type, phase="liquid",
+                             volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
+                             liquid_elasticity=fluid.liquid_elasticity)
+    fluid.Ps = new_Ps  # bar
+    # Dynamic head is small, so total pressure is the same as the static one
+    fluid.Pt = new_Ps  # bar
+    return fluid, mdot_outlet
 
 
 def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer, fuel, CC_pressure_at_injector, CR,

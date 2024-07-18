@@ -115,8 +115,7 @@ class TestRocketCycleFluid(unittest.TestCase):
 class TestRocketCycleElements(unittest.TestCase):
     def test_calculate_state_after_pump(self):
         """A function to test calculation of the state after pump function"""
-        # This will be done only for RocketEngineFluid, since for CoolProp it is very straightforward. We are going
-        # to assume some fictional thermophysical and compare the results with manual calculations.
+        # We are going to assume some fictional thermophysical and compare the results with manual calculations.
 
         # Calculate actual values
         fluid = RocketCycleFluid(species=["H2O(L)"], mass_fractions=[1], temperature=298.15, type="fuel",
@@ -126,7 +125,7 @@ class TestRocketCycleElements(unittest.TestCase):
         fluid.Ps = fluid.Pt  # bar
         fluid.mass_Cp_frozen = 1000  # J / (kg * K)
         pumped_fluid, enthalpy_change = RocketCycleElements.calculate_state_after_pump(
-            fluid=fluid, fluid_object="RocketCycleFluid", delta_P=60, efficiency=0.5)
+            fluid=fluid, delta_P=60, efficiency=0.5)
 
         # Calculate desired values
         outlet_density_isothermal = fluid.density / (1 - 60e5 / fluid.liquid_elasticity)  # kg / m^3
@@ -196,7 +195,7 @@ class TestRocketCycleElements(unittest.TestCase):
 
         # Get fluid after cooling channels
         coolant, mdot = RocketCycleElements.calculate_state_after_cooling_channels(
-            fluid=coolant, fluid_object="RocketCycleFluid", mdot_coolant=149, mdot_film=20, pressure_drop=150,
+            fluid=coolant, mdot_coolant=149, mdot_film=20, pressure_drop=150,
             temperature_rise=100)
 
         # Compare the results
