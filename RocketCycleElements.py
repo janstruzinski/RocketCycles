@@ -2,6 +2,7 @@ from rocketcea.cea_obj_w_units import CEA_Obj
 import rocketcea.cea_obj as rcea
 import scipy.optimize as opt
 from RocketCycleFluid import RocketCycleFluid, reformat_CEA_mass_fractions
+import warnings
 
 
 def calculate_state_after_pump_for_PyFluids(fluid, delta_P, efficiency):
@@ -62,12 +63,15 @@ def calculate_state_after_pump(fluid, delta_P, efficiency):
     return fluid, w_total
 
 
-def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, products_velocity):
+def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocity, fuel=None, oxidizer=None,
+                                    monopropellant=None):
     """A function to calculate the state of the combustion product mixture in the preburner based on inflow
     propellants.
 
     :param RocketCycleFluid fuel: RocketCycleFluid object representing fuel
     :param RocketCycleFluid oxidizer: RocketCycleFluid object representing oxidizer
+    :param RocketCycleFluid monopropellant: RocketCycleFluid object representing monopropellant (if used instead of
+     oxidizer and fuel)
     :param float or int OF: Oxidizer-to-Fuel ratio
     :param float or int preburner_inj_pressure: Preburner pressure at the injector face
     :param float or int products_velocity: Velocity of the combustion products when they enter turbine
@@ -76,10 +80,23 @@ def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, 
 
     # First get the CEA propellant cards. Joule - Thomson effect (temperature
     # increases) in injector is neglected, as even for extreme cases (pressure drops of ~100 bar) it on the order of few
-    # degrees for both liquids or hot gases (the only fluids coming into combustion chamber in closed cycles),
+    # degrees for both liquids or hot gases (the only fluids coming into combustion chambers in closed cycles),
     # so irrelevant.
-    rcea.add_new_fuel("fuel card", fuel.CEA_card)
-    rcea.add_new_oxidizer("oxidizer card", oxidizer.CEA_card)
+    if fuel is not None and oxidizer is not None:
+        rcea.add_new_fuel("fuel card", fuel.CEA_card)
+        rcea.add_new_oxidizer("oxidizer card", oxidizer.CEA_card)
+
+    elif monopropellant is not None:
+        rcea.add_new_propellant("monoprop card", monopropellant.CEA_card)
+
+    # Raise an error if fuel, oxidizer or monopropellant not assigned correctly
+    elif fuel is not None and oxidizer is not None and monopropellant is not None:
+        warnings.simplefilter("error", UserWarning)
+        warnings.warn("Both oxidizer - fuel combination and monopropellant were assigned.")
+
+    else:
+        warnings.simplefilter("error", UserWarning)
+        warnings.warn("Wrong input for fuel and oxidizer, or monopropellant")
 
     # Get CEA output, but first find the right CR.
     # Explanation: Preburner products need to have the right velocity when they come into turbine inlet (as given
@@ -101,7 +118,10 @@ def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, 
             but a measure of its cross-sectional area
         :return: A residual between obtained and desired velocity at the end of preburner (in m/s)
         """
-        preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
+        if fuel is not None and oxidizer is not None:
+            preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
+        elif monopropellant is not None:
+            preburner = rcea.CEA_Obj(propName="monoprop card", fac_CR=CR)
         a = preburner.get_SonicVelocities(Pc=pressure_preburner_inj_psia, MR=OF)[0] * 0.3048  # m/s
         M = preburner.get_Chamber_MachNumber(Pc=pressure_preburner_inj_psia, MR=OF)
         return M * a - products_velocity  # m/s
@@ -113,15 +133,24 @@ def calculate_state_after_preburner(fuel, oxidizer, OF, preburner_inj_pressure, 
     # Get the full CEA output, the combustion products' composition, plenum pressure, temperature and specific heat
     # in the combustor. To get full CEA output as a string, CEA object that is not a SI units wrapper needs to be
     # created (as the wrapper does not have such function).
-    preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
+    if fuel is not None and oxidizer is not None:
+        preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
+    elif monopropellant is not None:
+        preburner = rcea.CEA_Obj(propName="monoprop card", fac_CR=CR)
     preburner_CEA_output = preburner.get_full_cea_output(Pc=preburner_inj_pressure, MR=OF, pc_units="bar", output="si",
                                                          short_output=1)
 
     # Afterward SI units CEA object is created, so that variables with regular units are returned
-    preburner = CEA_Obj(oxName="oxidizer card", fuelName="fuel card", isp_units='sec', cstar_units='m/s',
-                        pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s', enthalpy_units='kJ/kg',
-                        density_units='kg/m^3', specific_heat_units='kJ/kg-K', viscosity_units='millipoise',
-                        thermal_cond_units='W/cm-degC', fac_CR=CR)
+    if fuel is not None and oxidizer is not None:
+        preburner = CEA_Obj(oxName="oxidizer card", fuelName="fuel card", isp_units='sec', cstar_units='m/s',
+                            pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                            enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                            viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
+    elif monopropellant is not None:
+        preburner = CEA_Obj(propName="monoprop card", isp_units='sec', cstar_units='m/s',
+                            pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                            enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                            viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
 
     # Get temperature in the preburner and gamma of the products
     preburner_temperature = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
@@ -219,7 +248,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
 
     # Define gas at the outlet of the current stage
     outlet_gas = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
-                                  temperature=Ts, type=inlet_gas.type, phase=inlet_gas.phase)
+                                  temperature=float(Ts), type=inlet_gas.type, phase=inlet_gas.phase)
 
     # Calculate total temperature
     outlet_gas.velocity = turbine_axial_velocity  # m / s
