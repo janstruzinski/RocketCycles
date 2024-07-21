@@ -153,7 +153,8 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
                             enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
                             viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
 
-    # Get temperature in the preburner and gamma of the products
+    # Get temperature in the preburner and gamma of the products. It is assumed that preburner efficiency only affects
+    # temperature but not gas composition, as the difference between the two temperatures is small.
     preburner_temperature_ideal = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
     preburner_temperature = preburner_temperature_ideal * preburner_eta
 
