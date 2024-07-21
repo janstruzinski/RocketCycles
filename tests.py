@@ -157,7 +157,7 @@ class TestRocketCycleElements(unittest.TestCase):
         Propane = RocketCycleFluid(species=["C3H8(L)"], mass_fractions=[1], temperature=231.08, type="fuel",
                                    phase="liquid", species_molar_Cp=[92.974])
         preburner_CEA_output, preburner_products = RocketCycleElements.calculate_state_after_preburner(
-            fuel=Propane, oxidizer=LOX, OF=50, preburner_inj_pressure=600, products_velocity=223.293)
+            fuel=Propane, oxidizer=LOX, OF=50, preburner_inj_pressure=600, products_velocity=223.293, preburner_eta=1)
 
         # Compare the results
         np.testing.assert_allclose([preburner_products.Ts, preburner_products.mass_Cp_frozen],
@@ -230,7 +230,7 @@ class TestRocketCycleElements(unittest.TestCase):
         CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e = (
             RocketCycleElements.calculate_combustion_chamber_performance(
                 mdot_oxidizer=400, mdot_fuel=100, oxidizer=oxidizer, fuel=fuel, CC_pressure_at_injector=300, CR=2.5,
-                eps=100))
+                eps=100, eta_cstar=1, eta_isp=1))
 
         # Compare the results
         np.testing.assert_allclose([IspVac, IspSea, ThrustVac, ThrustSea], [desired_IspVac, desired_IspSea,

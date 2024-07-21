@@ -63,8 +63,8 @@ def calculate_state_after_pump(fluid, delta_P, efficiency):
     return fluid, w_total
 
 
-def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocity, fuel=None, oxidizer=None,
-                                    monopropellant=None):
+def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocity, preburner_eta,
+                                    fuel=None, oxidizer=None, monopropellant=None):
     """A function to calculate the state of the combustion product mixture in the preburner based on inflow
     propellants.
 
@@ -72,6 +72,7 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
     :param RocketCycleFluid oxidizer: RocketCycleFluid object representing oxidizer
     :param RocketCycleFluid monopropellant: RocketCycleFluid object representing monopropellant (if used instead of
      oxidizer and fuel)
+    :param float or int preburner_eta: Combustor efficiency (-), which is the ratio of delivered to ideal temperature
     :param float or int OF: Oxidizer-to-Fuel ratio
     :param float or int preburner_inj_pressure: Preburner pressure at the injector face
     :param float or int products_velocity: Velocity of the combustion products when they enter turbine
@@ -153,7 +154,8 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
                             viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
 
     # Get temperature in the preburner and gamma of the products
-    preburner_temperature = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
+    preburner_temperature_ideal = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
+    preburner_temperature = preburner_temperature_ideal * preburner_eta
 
     # Get preburner pressure at its end
     preburner_plenum_pressure = (preburner_inj_pressure /
@@ -327,7 +329,7 @@ def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, press
 
 
 def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer, fuel, CC_pressure_at_injector, CR,
-                                             eps):
+                                             eps, eta_cstar, eta_isp):
     """A function to calculate the combustion chamber performance.
 
     :param float or int mdot_oxidizer: Oxidizer massflow (kg/s)
@@ -338,8 +340,8 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     :param float or int CR: CC contraction ratio
     :param float or int eps: CC expansion ratio
 
-    :return: Full CEA output, CC plenum pressure, vacuum and sea level specific impulse, combustion temperature,
-        vacuum and sea level thrust, throat and exit areas
+    :return: Full CEA output, CC plenum pressure, real vacuum and sea level specific impulse,
+     ideal combustion temperature, real vacuum and sea level thrust, throat and exit areas
     """
 
     # Get total massflow and OF
@@ -364,12 +366,13 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     CC_plenum_pressure = CC_pressure_at_injector / CC.get_Pinj_over_Pcomb(Pc=CC_pressure_at_injector, MR=OF)  # bar
 
     # Get throat and exit area
-    A_t = Cstar * mdot_total / (CC_plenum_pressure * 1e5)  # m^2
+    A_t = Cstar * mdot_total * eta_cstar / (CC_plenum_pressure * 1e5)  # m^2
     A_e = A_t * eps  # m^2
 
     # Get vacuum thrust, sea level thrust and Isp
-    ThrustVac = IspVac * 9.80665 * mdot_total  # N
+    IspVac_real = eta_isp * IspVac
+    ThrustVac = IspVac_real * 9.80665 * mdot_total  # N
     ThrustSea = ThrustVac - 1.01325 * 1e5 * A_e  # N
-    IspSea = ThrustSea / (mdot_total * 9.80665)  # s
+    IspSea_real = ThrustSea / (mdot_total * 9.80665)  # s
 
-    return CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e
+    return CC_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e
