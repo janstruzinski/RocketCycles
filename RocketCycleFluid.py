@@ -20,6 +20,9 @@ def PyFluid_to_CEA_fluid(fluid, CEA_name, type, phase):
 
     propellant = RocketCycleFluid(species=[CEA_name], mass_fractions=[1], type=type, temperature=fluid.temperature,
                                   phase=phase)
+    propellant.Ps = fluid.pressure / 1e5
+    propellant.Pt = propellant.Ps
+    propellant.density = propellant.density
 
     return propellant
 
@@ -296,7 +299,7 @@ class RocketCycleFluid:
         # First create a CEA object with Imperial units, such that full output can be obtained
         rcea.add_new_propellant(name="equilibrium card", card_str=self.CEA_card)
         equilibrium = rcea.CEA_Obj(propName="equilibrium card")
-        equilibrium_output = equilibrium.get_full_cea_output(Pc=self.Ps, pc_units="bar", output="si", short_output=1)
+        equilibrium_CEA_output = equilibrium.get_full_cea_output(Pc=self.Ps, pc_units="bar", output="si", short_output=1)
 
         # Now create a CEA object with SI units to get values expressed with them
         equilibrium = CEA_Obj(propName="equilibrium card", isp_units='sec', cstar_units='m/s',
@@ -321,8 +324,10 @@ class RocketCycleFluid:
                                              mass_fractions=list(equilibrium_mass_fractions.values()),
                                              temperature=equilibrium_temperature, type=self.type, phase=self.phase)
         equilibrium_fluid.Ps = self.Ps                          # bar
+        equilibrium_fluid.velocity = self.velocity
+        equilibrium_fluid.calculate_total_from_static_pressure()
         equilibrium_fluid.viscosity = viscosity                 # milipoise
         equilibrium_fluid.mass_Cp_equilibrium = Cp_equilibrium  # J / (kg * K)
 
         # Return the new RocketCycleFluid and CEA full output
-        return equilibrium_fluid, equilibrium_output
+        return equilibrium_fluid, equilibrium_CEA_output
