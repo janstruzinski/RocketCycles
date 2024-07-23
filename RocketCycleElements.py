@@ -154,7 +154,8 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
                             viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
 
     # Get temperature in the preburner and gamma of the products. It is assumed that preburner efficiency only affects
-    # temperature but not gas composition, as the difference between the two temperatures is small.
+    # temperature but not gas composition, as the difference between the two temperatures is very small, so composition
+    # and other properties should be similar.
     preburner_temperature_ideal = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
     preburner_temperature = preburner_temperature_ideal * preburner_eta
 
@@ -273,10 +274,10 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     outlet_gas.calculate_static_from_total_pressure()
 
     # After the turbine outlet, perform equilibrium
-    equilibrium_gas, equilibrium_output = outlet_gas.equilibrate()
+    equilibrium_gas, equilibrium_CEA_output = outlet_gas.equilibrate()
 
     # Return turbine calculations results
-    return beta_tt, outlet_gas, equilibrium_gas, equilibrium_output
+    return beta_tt, outlet_gas, equilibrium_gas, equilibrium_CEA_output
 
 
 def calculate_state_after_cooling_channels_for_Pyfluids(fluid, mdot_coolant, mdot_film, pressure_drop,
@@ -355,7 +356,7 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
 
     # Create CEA object with Imperial units to be able to get full output
     CC = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
-    CC_output = CC.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF, eps=eps, pc_units="bar", output="si",
+    CC_CEA_output = CC.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF, eps=eps, pc_units="bar", output="si",
                                        short_output=1)
 
     # Create CEA object with SI units for other variables
@@ -376,4 +377,4 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     ThrustSea = ThrustVac - 1.01325 * 1e5 * A_e  # N
     IspSea_real = ThrustSea / (mdot_total * 9.80665)  # s
 
-    return CC_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e
+    return CC_CEA_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e
