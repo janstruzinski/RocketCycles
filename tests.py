@@ -104,7 +104,7 @@ class TestRocketCycleFluid(unittest.TestCase):
         # Get temperature of combustion from RocketCycleFluid
         fluid = RocketCycleFluid(species=["O2", "H2"], mass_fractions=[0.5, 0.5], temperature=298.15, type="name",
                                  phase="gas")
-        fluid.Ps = 1  # bar
+        fluid.Pt = 1  # bar
         equilibrium_fluid, equilibrium_output = fluid.equilibrate()
 
         # Compare temperatures
