@@ -17,7 +17,8 @@ def calculate_state_after_pump_for_PyFluids(fluid, delta_P, efficiency):
 
     # For PyFluid, a built-in function can be used.
     old_enthalpy = fluid.enthalpy  # J / kg
-    fluid.compression_to_pressure(pressure=fluid.pressure + delta_P * 1e5, isentropic_efficiency=efficiency)
+    fluid = fluid.compression_to_pressure(
+        pressure=fluid.pressure + delta_P * 1e5, isentropic_efficiency=efficiency * 100)
     w_total = fluid.enthalpy - old_enthalpy  # J / kg
     return fluid, w_total
 
@@ -274,7 +275,13 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     outlet_gas.calculate_static_from_total_pressure()
 
     # After the turbine outlet, perform equilibrium
-    equilibrium_gas, equilibrium_CEA_output = outlet_gas.equilibrate()
+    outlet_gas_dummy = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
+                                        temperature=float(Ts), type="name", phase=inlet_gas.phase)
+    outlet_gas_dummy.Tt = outlet_gas.Tt
+    outlet_gas_dummy.Pt = outlet_gas.Pt
+    outlet_gas_dummy.Pt = outlet_gas.Pt
+    outlet_gas_dummy.velocity = outlet_gas.velocity
+    equilibrium_gas, equilibrium_CEA_output = outlet_gas_dummy.equilibrate()
 
     # Return turbine calculations results
     return beta_tt, outlet_gas, equilibrium_gas, equilibrium_CEA_output
@@ -297,8 +304,8 @@ def calculate_state_after_cooling_channels_for_Pyfluids(fluid, mdot_coolant, mdo
     mdot_outlet = mdot_coolant - mdot_film  # kg / s
 
     # For PyFluids' Fluid, object method can be used
-    fluid.heating_to_temperature(temperature=fluid.temperature + temperature_rise,
-                                 pressure_drop=pressure_drop * 1e5)
+    fluid = fluid.heating_to_temperature(temperature=fluid.temperature + temperature_rise,
+                                         pressure_drop=pressure_drop * 1e5)
     return fluid, mdot_outlet
 
 
@@ -357,7 +364,7 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     # Create CEA object with Imperial units to be able to get full output
     CC = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
     CC_CEA_output = CC.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF, eps=eps, pc_units="bar", output="si",
-                                       short_output=1)
+                                           short_output=1)
 
     # Create CEA object with SI units for other variables
     CC = CEA_Obj(oxName="oxidizer card", fuelName="fuel card", isp_units='sec', cstar_units='m/s',
