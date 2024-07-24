@@ -128,9 +128,9 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
         M = preburner.get_Chamber_MachNumber(Pc=pressure_preburner_inj_psia, MR=OF)
         return M * a - products_velocity  # m/s
 
-    # Solve the function for CR. Use bracketing method from FR 1 to 5. 1 is the lower physical limit for CR.
-    # 10 should correspond to a very slow turbine inlet velocity, so should be able to always converge.
-    CR = opt.toms748(calc_velocity_residual, a=1, b=10, maxiter=1000)
+    # Solve the function for CR. Use bracketing method from FR 1 to 20. 1 is the lower physical limit for CR.
+    # 20 should correspond to a very slow turbine inlet velocity, so should be able to always converge.
+    CR = opt.toms748(calc_velocity_residual, a=1, b=20, maxiter=1000)
 
     # Get the full CEA output, the combustion products' composition, plenum pressure, temperature and specific heat
     # in the combustor. To get full CEA output as a string, CEA object that is not a SI units wrapper needs to be
