@@ -1,6 +1,5 @@
 import RocketCycleElements
 from RocketCycleFluid import RocketCycleFluid, reformat_CEA_mass_fractions
-import RocketCycleElements as RocketCycle
 import rocketcea.cea_obj as rcea
 from rocketcea.cea_obj_w_units import CEA_Obj
 import unittest

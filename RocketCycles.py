@@ -1,5 +1,5 @@
 import RocketCycleElements
-from RocketCycleFluid import RocketCycleFluid, PyFluid_to_CEA_fluid
+from RocketCycleFluid import RocketCycleFluid, PyFluid_to_RocketCycleFluid
 import pyfluids
 import scipy.optimize as opt
 import numpy as np
@@ -180,7 +180,7 @@ class FFSC_LRE:
         CP.pumped_oxidizer, CP.w_pumped_oxidizer = RocketCycleElements.calculate_state_after_pump_for_PyFluids(
             fluid=CP.oxidizer, delta_P=dP_OP, efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
-        CP.pumped_oxidizer = PyFluid_to_CEA_fluid(fluid=CP.pumped_oxidizer, CEA_name=self.oxidizer_CEA_name,
+        CP.pumped_oxidizer = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_oxidizer, CEA_name=self.oxidizer_CEA_name,
                                                   type="oxidizer", phase="liquid")
 
         # Go over fuel side of the system. Calculate state after cooling channels and change fuel into RocketCycleFluid
@@ -190,7 +190,7 @@ class FFSC_LRE:
                 fluid=CP.pumped_fuel, mdot_coolant=CP.mdot_fuel, mdot_film=CP.mdot_film,
                 pressure_drop=self.cooling_channels_pressure_drop,
                 temperature_rise=self.cooling_channels_temperature_rise))
-        CP.heated_fuel = PyFluid_to_CEA_fluid(fluid=CP.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
+        CP.heated_fuel = PyFluid_to_RocketCycleFluid(fluid=CP.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
                                               phase="liquid")
 
         # Calculate state after fuel preburner
