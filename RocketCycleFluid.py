@@ -18,11 +18,11 @@ def PyFluid_to_RocketCycleFluid(fluid, CEA_name, type, phase):
     :return: RocketCycleFluid object equivalent of Fluid passed.
     """
 
-    propellant = RocketCycleFluid(species=[CEA_name], mass_fractions=[1], type=type, temperature=fluid.temperature,
-                                  phase=phase)
+    propellant = RocketCycleFluid(species=[CEA_name], mass_fractions=[1], type=type,
+                                  temperature=fluid.temperature + 273.15, phase=phase)
     propellant.Ps = fluid.pressure / 1e5
     propellant.Pt = propellant.Ps
-    propellant.density = propellant.density
+    propellant.density = fluid.density
 
     return propellant
 
