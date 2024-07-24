@@ -275,13 +275,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     outlet_gas.calculate_static_from_total_pressure()
 
     # After the turbine outlet, perform equilibrium
-    outlet_gas_dummy = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
-                                        temperature=float(Ts), type="name", phase=inlet_gas.phase)
-    outlet_gas_dummy.Tt = outlet_gas.Tt
-    outlet_gas_dummy.Pt = outlet_gas.Pt
-    outlet_gas_dummy.Pt = outlet_gas.Pt
-    outlet_gas_dummy.velocity = outlet_gas.velocity
-    equilibrium_gas, equilibrium_CEA_output = outlet_gas_dummy.equilibrate()
+    equilibrium_gas, equilibrium_CEA_output = outlet_gas.equilibrate()
 
     # Return turbine calculations results
     return beta_tt, outlet_gas, equilibrium_gas, equilibrium_CEA_output

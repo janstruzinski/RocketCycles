@@ -297,8 +297,12 @@ class RocketCycleFluid:
         # can be obtained to find a new chemical equilibrium. Total pressure is used, because the function is
         # intended for calculating equilibrium after turbine, where the gas slowed down a lot in the manifold.
 
+        # Modify CEA card, such that CEA thinks it is monopropellant.
+        CEA_card = self.CEA_card.replace("oxid", "name")
+        CEA_card = CEA_card.replace("fuel", "name")
+
         # First create a CEA object with Imperial units, such that full output can be obtained
-        rcea.add_new_propellant(name="equilibrium card", card_str=self.CEA_card)
+        rcea.add_new_propellant(name="equilibrium card", card_str=CEA_card)
         equilibrium = rcea.CEA_Obj(propName="equilibrium card")
         equilibrium_CEA_output = equilibrium.get_full_cea_output(Pc=self.Pt, pc_units="bar", output="si", short_output=1)
 
