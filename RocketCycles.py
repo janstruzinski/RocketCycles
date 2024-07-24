@@ -77,9 +77,10 @@ class FFSC_LRE:
     def __init__(self, OF, ThrustSea, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
                  P_oxidizer, P_fuel, P_plenum_CC, T_FPB, T_OPB, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
                  eta_polytropic_FT, eta_FPB, eta_OPB, eta_cstar, eta_isp, dP_over_Pinj_CC, dP_over_Pinj_OPB,
-                 dP_over_Pinj_FPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel, cooling_channels_pressure_drop,
-                 cooling_channels_temperature_rise, axial_velocity_OT, axial_velocity_FT, mdot_total_0,
-                 mdot_crossflow_ox_over_mdot_ox_0, mdot_crossflow_f_over_mdot_f_0, dP_FP_0, dP_OP_0, lb, ub):
+                 dP_over_Pinj_FPB, CR_FPB, CR_OPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel,
+                 cooling_channels_pressure_drop, cooling_channels_temperature_rise, axial_velocity_OT,
+                 axial_velocity_FT, mdot_total_0, mdot_crossflow_ox_over_mdot_ox_0, mdot_crossflow_f_over_mdot_f_0,
+                 dP_FP_0, dP_OP_0, lb, ub):
         """A class to analyse full flow staged combustion cycle.
 
 
@@ -122,7 +123,9 @@ class FFSC_LRE:
         self.dP_over_Pinj_OPB = dP_over_Pinj_OPB
         self.dP_over_Pinj_FPB = dP_over_Pinj_FPB
 
-        # Assign combustion chamber parameters
+        # Assign combustion chamber and preburner parameters
+        self.CR_FPB = CR_FPB
+        self.CR_OPB = CR_OPB
         self.CR_CC = CR_CC
         self.eps_CC = eps_CC
         self.mdot_film_over_mdot_fuel = mdot_film_over_mdot_fuel
@@ -203,7 +206,7 @@ class FFSC_LRE:
         # For determining preburner pressure, use minimum propellant pressure
         CP.P_inj_FPB = min(CP.heated_fuel.Pt, CP.pumped_oxidizer.Pt) / (1 + self.dP_over_Pinj_FPB)
         CP.FPB_CEA_output, CP.FPB_products = RocketCycleElements.calculate_state_after_preburner(
-            OF=CP.OF_FPB, preburner_inj_pressure=CP.P_inj_FPB, products_velocity=self.axial_velocity_FT,
+            OF=CP.OF_FPB, preburner_inj_pressure=CP.P_inj_FPB, CR=self.CR_FPB,
             preburner_eta=self.eta_FPB, fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
 
         # Calculate state after fuel turbine
@@ -211,7 +214,7 @@ class FFSC_LRE:
         CP.FT_beta_tt, CP.FT_outlet_gas, CP.FT_equilibrium_gas, CP.FT_equilibrium_gas_CEA_output = (
             RocketCycleElements.calculate_state_after_turbine(
                 massflow=CP.mdot_FT, turbine_power=CP.Power_FP, turbine_polytropic_efficiency=self.eta_polytropic_FT,
-                inlet_gas=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT))
+                preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT))
 
         # Now go over oxidizer side of the system. Calculate state after oxygen preburner.
         CP.mdot_ox_OPB = CP.mdot_oxidizer - CP.mdot_crossflow_oxidizer
@@ -219,7 +222,7 @@ class FFSC_LRE:
         # For determining preburner pressure, use minimum propellant pressure
         CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.heated_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
         CP.OPB_CEA_output, CP.OPB_products = RocketCycleElements.calculate_state_after_preburner(
-            OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, products_velocity=self.axial_velocity_OT,
+            OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
             preburner_eta=self.eta_OPB, fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
 
         # Calculate state after oxygen turbine.
@@ -227,7 +230,7 @@ class FFSC_LRE:
         CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output = (
             RocketCycleElements.calculate_state_after_turbine(
                 massflow=CP.mdot_OT, turbine_power=CP.Power_OP, turbine_polytropic_efficiency=self.eta_polytropic_OT,
-                inlet_gas=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT))
+                preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT))
 
         # Calculate combustion chamber performance. It does not matter with respect to which propellant pressure we
         # calculate its CC pressure, as it is imposed that these are the same below. Total pressure is used because
@@ -300,6 +303,7 @@ class FFSC_LRE:
              f"Film cooling massflow to fuel massflow: {self.mdot_film_over_mdot_fuel}\n"
              f"Cooling channels pressure drop: {self.cooling_channels_pressure_drop} bar    "
              f"Cooling channels temperature rise: {self.cooling_channels_temperature_rise} K\n"
+             f"OPB CR: {self.CR_OPB}    FPB CR: {self.CR_FPB} \n"
              f"OT axial velocity: {self.axial_velocity_OT} m/s      FT axial velocity: {self.axial_velocity_OT} m/s\n\n"
              f"---MASSFLOWS---\n"
              f"Total massflow: {self.mdot_total} kg/s   Oxidizer massflow: {self.CP.mdot_oxidizer} kg/s     "

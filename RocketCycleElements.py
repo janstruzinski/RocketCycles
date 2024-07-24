@@ -64,7 +64,7 @@ def calculate_state_after_pump(fluid, delta_P, efficiency):
     return fluid, w_total
 
 
-def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocity, preburner_eta,
+def calculate_state_after_preburner(OF, preburner_inj_pressure, CR, preburner_eta,
                                     fuel=None, oxidizer=None, monopropellant=None):
     """A function to calculate the state of the combustion product mixture in the preburner based on inflow
     propellants.
@@ -76,7 +76,8 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
     :param float or int preburner_eta: Combustor efficiency (-), which is the ratio of delivered to ideal temperature
     :param float or int OF: Oxidizer-to-Fuel ratio
     :param float or int preburner_inj_pressure: Preburner pressure at the injector face
-    :param float or int products_velocity: Velocity of the combustion products when they enter turbine
+    :param float or int CR: "Contraction ratio" of the preburner, which is used as a measure of its cross-sectional
+     area in order to model Rayleigh line loss.
     :return: Preburner CEA full output, RocketEngineFluid representing its products
     """
 
@@ -100,47 +101,21 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
         warnings.simplefilter("error", UserWarning)
         warnings.warn("Wrong input for fuel and oxidizer, or monopropellant")
 
-    # Get CEA output, but first find the right CR.
-    # Explanation: Preburner products need to have the right velocity when they come into turbine inlet (as given
-    # by its flow coefficient and rotational speed). There will be also some correlated Rayleigh line loss due to
-    # non-adiabatic flow in the preburner. To model this, we are going to vary contraction ratio of the CEA_Obj
-    # class, even though preburner does not have a nozzle or any contraction. However, this will vary preburner
-    # cross-sectional area (as there is no difference preburner and cylindrical section of combustion chamber) and
-    # allow to achieve desired velocity at its end and consequently get the pressure loss.
-
-    # First convert preburner pressure to Imperial units, as SI wrapper around rocketCEA does not have a function to get
-    # Mach number at the end of chamber
-    pressure_preburner_inj_psia = preburner_inj_pressure * 14.5037738  # convert pressure in bar to psia
-
-    # Then create a function to solve numerically that gives the right CR
-    def calc_velocity_residual(CR):
-        """A function to calculate a residual between obtained and desired velocity at the end of preburner
-
-        :param float or int CR: Contraction ratio of the combustor. In this case it is not an actual contraction ratio,
-            but a measure of its cross-sectional area
-        :return: A residual between obtained and desired velocity at the end of preburner (in m/s)
-        """
-        if fuel is not None and oxidizer is not None:
-            preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
-        elif monopropellant is not None:
-            preburner = rcea.CEA_Obj(propName="monoprop card", fac_CR=CR)
-        a = preburner.get_SonicVelocities(Pc=pressure_preburner_inj_psia, MR=OF)[0] * 0.3048  # m/s
-        M = preburner.get_Chamber_MachNumber(Pc=pressure_preburner_inj_psia, MR=OF)
-        return M * a - products_velocity  # m/s
-
-    # Solve the function for CR. Use bracketing method from FR 1 to 20. 1 is the lower physical limit for CR.
-    # 20 should correspond to a very slow turbine inlet velocity, so should be able to always converge.
-    CR = opt.toms748(calc_velocity_residual, a=1, b=20, maxiter=1000)
-
     # Get the full CEA output, the combustion products' composition, plenum pressure, temperature and specific heat
     # in the combustor. To get full CEA output as a string, CEA object that is not a SI units wrapper needs to be
-    # created (as the wrapper does not have such function).
+    # created (as the wrapper does not have such function).  It is also used to get products velocity at the end of
+    # preburner.
     if fuel is not None and oxidizer is not None:
         preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
     elif monopropellant is not None:
         preburner = rcea.CEA_Obj(propName="monoprop card", fac_CR=CR)
     preburner_CEA_output = preburner.get_full_cea_output(Pc=preburner_inj_pressure, MR=OF, pc_units="bar", output="si",
                                                          short_output=1)
+    # To get sonic velocity and Mach number at the end of preburner, pressure in psia needs to be used, as SI Units
+    # wrapper does not have these functions.
+    a = preburner.get_SonicVelocities(Pc=preburner_inj_pressure * 14.5037738, MR=OF)[0] * 0.3048  # m/s
+    M = preburner.get_Chamber_MachNumber(Pc=preburner_inj_pressure * 14.5037738, MR=OF)
+    products_velocity = M * a
 
     # Afterward SI units CEA object is created, so that variables with regular units are returned
     if fuel is not None and oxidizer is not None:
@@ -194,7 +169,7 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, products_velocit
     return preburner_CEA_output, preburner_products
 
 
-def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_efficiency, inlet_gas,
+def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_efficiency, preburner_products,
                                   turbine_axial_velocity):
     """A function to calculate the pressure ratio of the turbine and the state of the propellant after it passes
     the turbine.
@@ -202,7 +177,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     :param int or float massflow: A massflow through the turbine (kg/s)
     :param int or float turbine_power:  A shaft power turbine needs to deliver (W)
     :param int or float turbine_polytropic_efficiency:  Polytropic efficiency of the turbine (from 0 to 1)
-    :param RocketCycleFluid inlet_gas:  RocketCycleFluid object representing fluid driving the turbine
+    :param RocketCycleFluid preburner_products:  RocketCycleFluid object representing preburner products at its end
     :param int or float turbine_axial_velocity: Axial velocity through the turbine
 
     :return: Turbine pressure ratio, RocketCycleFluid representing outlet gas,
@@ -230,6 +205,27 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     # together with static and total pressures at the outlet. Furthermore, it the heat ratio for any
     # expansion process in the turbine is based on average specific heat for it (as it depends on temperature).
 
+    # We have total and static properties of gas at the end of preburner. It will accelerate before the nozzle, hence
+    # the new static temperature and pressure need to be found using turbine axial velocity.
+    # Cp is calculated using static temperature, which is unknown. Therefore, it cannot be calculated from total
+    # temperature. Instead, static temperature needs to be iteratively found, such that total temperature is the same.
+
+    def calculate_temperature_residual(inlet_Ts):
+        inlet_gas = RocketCycleFluid(species=preburner_products.species,
+                                     mass_fractions=preburner_products.mass_fractions,
+                                     temperature=inlet_Ts, type=preburner_products.type, phase="gas")
+        inlet_gas.velocity = turbine_axial_velocity
+        inlet_gas.calculate_total_temperature()
+        return inlet_gas.Tt - preburner_products.Tt
+
+    Ts = opt.toms748(calculate_temperature_residual, a=288.15, b=preburner_products.Ts, maxiter=1000)
+    inlet_gas = RocketCycleFluid(species=preburner_products.species, mass_fractions=preburner_products.mass_fractions,
+                                 temperature=float(Ts), type=preburner_products.type, phase="gas")
+    inlet_gas.Pt = preburner_products.Pt
+    inlet_gas.velocity = turbine_axial_velocity
+    inlet_gas.calculate_total_temperature()
+    inlet_gas.calculate_static_from_total_pressure()
+
     # Calculate specific work of the turbine
     specific_work = ((turbine_power * 1e-3) / massflow) * (inlet_gas.MW * 1e-3)  # kJ / mol
     outlet_hs = inlet_gas.h0 - specific_work  # kJ / mol
@@ -248,8 +244,8 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
         return outlet_hs - outlet_gas.h0  # kJ / mol
 
     # Solve the function above. Bisection algorithm will be again used for guaranteed convergence. The lower limit is
-    # room temperature, the higher limit is inlet gas static temperature.
-    Ts = opt.toms748(calc_enthalpy_residual, a=288.15, b=inlet_gas.Ts, maxiter=1000)  # K
+    # 100 deg C, the higher limit is inlet gas static temperature.
+    Ts = opt.toms748(calc_enthalpy_residual, a=388.15, b=inlet_gas.Ts, maxiter=1000)  # K
 
     # Define gas at the outlet of the current stage
     outlet_gas = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,

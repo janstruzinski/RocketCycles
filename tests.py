@@ -150,13 +150,13 @@ class TestRocketCycleElements(unittest.TestCase):
         T_combustion = preburner.get_Tcomb(Pc=600, MR=50)  # K
         Cp_frozen = preburner.get_Chamber_Transport(Pc=600, MR=50, frozen=1)[0] * 1e3  # J / (kg * K)
 
-        # Get results from the function. CR above corresponds to the velocity of 223.293 m/s
+        # Get results from the function.
         LOX = RocketCycleFluid(species=["O2(L)"], mass_fractions=[1], temperature=90.17, type="oxid",
                                phase="liquid", species_molar_Cp=[50.180])
         Propane = RocketCycleFluid(species=["C3H8(L)"], mass_fractions=[1], temperature=231.08, type="fuel",
                                    phase="liquid", species_molar_Cp=[92.974])
         preburner_CEA_output, preburner_products = RocketCycleElements.calculate_state_after_preburner(
-            fuel=Propane, oxidizer=LOX, OF=50, preburner_inj_pressure=600, products_velocity=223.293, preburner_eta=1)
+            fuel=Propane, oxidizer=LOX, OF=50, preburner_inj_pressure=600, CR=1.5, preburner_eta=1)
 
         # Compare the results
         np.testing.assert_allclose([preburner_products.Ts, preburner_products.mass_Cp_frozen],
@@ -174,7 +174,8 @@ class TestRocketCycleElements(unittest.TestCase):
         inlet_gas.calculate_total_from_static_pressure()
         beta_tt, outlet_gas, equilibrium_gas, equilibrium_output = (
             RocketCycleElements.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
-                                                              turbine_polytropic_efficiency=0.85, inlet_gas=inlet_gas,
+                                                              turbine_polytropic_efficiency=0.85,
+                                                              preburner_products=inlet_gas,
                                                               turbine_axial_velocity=223.293))
         actual_w_specific = outlet_gas.h0 - inlet_gas.h0  # kJ / mol
 
