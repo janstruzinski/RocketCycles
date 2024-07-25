@@ -1,0 +1,27 @@
+Hi,
+
+Welcome to RocketCycles. It is a python library dedicated to sizing staged combustion rocket engine cycles, that
+allows to both analyse and size them, in order to get combustion chamber performance, pressure ratio of the turbines or
+pressure rise in the pumps, crossflow massflows etc.
+
+RocketCycleElements.py stores functions representing pumps, turbines, preburners, combustion chambers. They can be
+assembled together into staged combustion rocket engine cycle.
+
+RocketCycleFluid.py stores the class of the same name, that conveniently allows to store data about propellants or
+preburner products, as well as to get their thermophysical properties using NASA 9 polynomials or real gas density
+using PyFluids (wrapper about CoolProp).
+
+RocketCycles.py stores definitions of classes representing different staged combustion rocket engine cycles.
+These can be used as inspiration if you want to assemble your own closed cycle.
+
+examples.py shows how to call these classes and perform the analysis.
+
+tests.py stores unit tests for the library.
+
+It is highly recommened that you see the code, so that you know what is happening under the hood and are aware of any
+assumptions.
+
+I hope you will find the library useful!
+
+Cheers,
+Jan
