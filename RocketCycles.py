@@ -72,6 +72,12 @@ class CycleParameters:
         # Temperatures
         self.CC_Tcomb = None
 
+        # Other
+        self.OT_molar_Cp_average = None
+        self.OT_molar_Cp_average = None
+        self.FT_gamma_average = None
+        self.FT_gamma_average = None
+
 
 class FFSC_LRE:
     def __init__(self, OF, ThrustSea, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
@@ -213,7 +219,8 @@ class FFSC_LRE:
 
         # Calculate state after fuel turbine
         CP.mdot_FT = CP.mdot_f_FPB + CP.mdot_crossflow_oxidizer
-        CP.FT_beta_tt, CP.FT_outlet_gas, CP.FT_equilibrium_gas, CP.FT_equilibrium_gas_CEA_output = (
+        (CP.FT_beta_tt, CP.FT_outlet_gas, CP.FT_equilibrium_gas, CP.FT_equilibrium_gas_CEA_output,
+         CP.FT_molar_Cp_average, CP.FT_gamma_average) = (
             RocketCycleElements.calculate_state_after_turbine(
                 massflow=CP.mdot_FT, turbine_power=CP.Power_FP, turbine_polytropic_efficiency=self.eta_polytropic_FT,
                 preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT))
@@ -229,7 +236,8 @@ class FFSC_LRE:
 
         # Calculate state after oxygen turbine.
         CP.mdot_OT = CP.mdot_ox_OPB + CP.mdot_crossflow_fuel
-        CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output = (
+        (CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output,
+         CP.OT_molar_Cp_average, CP.OT_gamma_average) = (
             RocketCycleElements.calculate_state_after_turbine(
                 massflow=CP.mdot_OT, turbine_power=CP.Power_OP, turbine_polytropic_efficiency=self.eta_polytropic_OT,
                 preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT))
@@ -280,7 +288,7 @@ class FFSC_LRE:
     def get_full_output(self):
         """A function to return the string with the results."""
         string = \
-            (f"--- INPUT PARAMETERS ---\n"
+            (f"\n\n--- INPUT PARAMETERS ---\n"
              f"---Top level parameters---\n"
              f"O/F: {self.OF}   Thrust: {self.ThrustSea} kN    CC plenum pressure: {self.P_plenum_CC} bar\n"
              f"---Propellants---\n"
@@ -332,7 +340,9 @@ class FFSC_LRE:
              f"Outlet gas static tempetature: {self.CP.FT_outlet_gas.Ts} K  "
              f"Outlet gas total tempetature: {self.CP.FT_outlet_gas.Tt} K\n"
              f"Outlet gas static pressure: {self.CP.FT_outlet_gas.Ps} bar  "
-             f"Outlet gas total pressure: {self.CP.FT_outlet_gas.Pt} bar\n\n"
+             f"Outlet gas total pressure: {self.CP.FT_outlet_gas.Pt} bar\n"
+             f"Gas temperature in CC manifold: {self.CP.FT_equilibrium_gas.Ts} K  "
+             f"Gas temperature pressure in CC manifold: {self.CP.FT_equilibrium_gas.Pt} bar\n\n"
              f"---OXIDIZER SIDE---\n"
              f"---Oxidizer pump---\n"
              f"OP pressure rise: {self.dP_OP} bar   "
@@ -350,7 +360,9 @@ class FFSC_LRE:
              f"Outlet gas static tempetature: {self.CP.OT_outlet_gas.Ts} K  "
              f"Outlet gas total tempetature: {self.CP.OT_outlet_gas.Tt} K\n"
              f"Outlet gas static pressure: {self.CP.OT_outlet_gas.Ps} bar  "
-             f"Outlet gas total pressure: {self.CP.OT_outlet_gas.Pt} bar\n\n"
+             f"Outlet gas total pressure: {self.CP.OT_outlet_gas.Pt} bar\n"
+             f"Gas temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
+             f"Gas temperature pressure in CC manifold: {self.CP.OT_equilibrium_gas.Pt} bar\n\n"
              f"---COMBUSTION CHAMBER---\n"
              f"Pressure at injector: {self.CP.P_inj_CC} bar   Plenum pressure: {self.CP.P_plenum_CC} bar "
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"

@@ -274,7 +274,7 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     equilibrium_gas, equilibrium_CEA_output = outlet_gas.equilibrate()
 
     # Return turbine calculations results
-    return beta_tt, outlet_gas, equilibrium_gas, equilibrium_CEA_output
+    return beta_tt, outlet_gas, equilibrium_gas, equilibrium_CEA_output, average_molar_Cp, gamma_average
 
 
 def calculate_state_after_cooling_channels_for_Pyfluids(fluid, mdot_coolant, mdot_film, pressure_drop,

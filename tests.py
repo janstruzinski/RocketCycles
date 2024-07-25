@@ -172,7 +172,7 @@ class TestRocketCycleElements(unittest.TestCase):
         inlet_gas.calculate_total_temperature()
         inlet_gas.Ps = 600  # bar
         inlet_gas.calculate_total_from_static_pressure()
-        beta_tt, outlet_gas, equilibrium_gas, equilibrium_output = (
+        beta_tt, outlet_gas, equilibrium_gas, equilibrium_output, average_molar_Cp, gamma_average = (
             RocketCycleElements.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
                                                               turbine_polytropic_efficiency=0.85,
                                                               preburner_products=inlet_gas,
