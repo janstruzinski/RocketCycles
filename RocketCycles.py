@@ -147,7 +147,7 @@ class FFSC_LRE:
 
         # Get the solution. Least-squares is used, because it is the only method that would converge.
         result = opt.least_squares(fun=self.get_residuals, x0=x0, jac="3-point", bounds=bounds,
-                                   method="dogbox", loss="soft_l1", tr_solver="exact", verbose=2, xtol=1e-10)
+                                   method="dogbox", loss="soft_l1", tr_solver="exact", verbose=2)
         [self.mdot_total, self.mdot_crossflow_ox_over_mdot_ox, self.mdot_crossflow_fuel_over_mdot_fuel, self.dP_FP,
          self.dP_OP] = result.x * self.x_ref
 
@@ -190,14 +190,16 @@ class FFSC_LRE:
         CP.pumped_oxidizer = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_oxidizer, CEA_name=self.oxidizer_CEA_name,
                                                          type="oxidizer", phase="liquid")
 
-        # Go over fuel side of the system. Calculate state after cooling channels and change fuel into RocketCycleFluid
-        # object.
+        # Go over fuel side of the system. Calculate state after cooling channels and change both heated and pumped
+        # fuel into RocketCycleFluid object. Pumped fuel will be still used later on for oxygen preburner.
         CP.heated_fuel, CP.mdot_cooling_channels_outlet = (
             RocketCycleElements.calculate_state_after_cooling_channels_for_Pyfluids(
                 fluid=CP.pumped_fuel, mdot_coolant=CP.mdot_fuel, mdot_film=CP.mdot_film,
                 pressure_drop=self.cooling_channels_pressure_drop,
                 temperature_rise=self.cooling_channels_temperature_rise))
         CP.heated_fuel = PyFluid_to_RocketCycleFluid(fluid=CP.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
+                                                     phase="liquid")
+        CP.pumped_fuel = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
                                                      phase="liquid")
 
         # Calculate state after fuel preburner
@@ -220,10 +222,10 @@ class FFSC_LRE:
         CP.mdot_ox_OPB = CP.mdot_oxidizer - CP.mdot_crossflow_oxidizer
         CP.OF_OPB = CP.mdot_ox_OPB / CP.mdot_crossflow_fuel
         # For determining preburner pressure, use minimum propellant pressure
-        CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.heated_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
+        CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
         CP.OPB_CEA_output, CP.OPB_products = RocketCycleElements.calculate_state_after_preburner(
             OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
-            preburner_eta=self.eta_OPB, fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
+            preburner_eta=self.eta_OPB, fuel=CP.pumped_fuel, oxidizer=CP.pumped_oxidizer)
 
         # Calculate state after oxygen turbine.
         CP.mdot_OT = CP.mdot_ox_OPB + CP.mdot_crossflow_fuel
@@ -235,7 +237,7 @@ class FFSC_LRE:
         # Calculate combustion chamber performance. It does not matter with respect to which propellant pressure we
         # calculate its CC pressure, as it is imposed that these are the same below. Total pressure is used because
         # the gas should slow down in the turbine outlet manifold
-        CP.P_inj_CC = CP.FT_equilibrium_gas.Pt / (1 + self.dP_over_Pinj_CC)
+        CP.P_inj_CC = min(CP.FT_equilibrium_gas.Pt, CP.OT_equilibrium_gas.Pt) / (1 + self.dP_over_Pinj_CC)
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
          CP.A_t_CC, CP.A_e_CC) = (RocketCycleElements.calculate_combustion_chamber_performance(
             mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT, oxidizer=CP.OT_equilibrium_gas,
@@ -314,7 +316,7 @@ class FFSC_LRE:
              f"---FUEL SIDE----\n"
              f"---Fuel Pump---\n"
              f"FP pressure rise: {self.dP_FP} bar   "
-             f"FP temperature rise: {self.CP.pumped_fuel.temperature + 273.15 - self.T_fuel} K   "
+             f"FP temperature rise: {self.CP.pumped_fuel.Ts - self.T_fuel} K   "
              f"Pump power: {self.CP.Power_FP * 1e-3} kW\n"
              f"---Cooling channels---\n"
              f"Fuel temperature: {self.CP.heated_fuel.Ts} K     Fuel pressure: {self.CP.heated_fuel.Ps} bar\n"
