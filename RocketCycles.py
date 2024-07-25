@@ -80,23 +80,80 @@ class CycleParameters:
 
 
 class FFSC_LRE:
-    def __init__(self, OF, ThrustSea, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
-                 P_oxidizer, P_fuel, P_plenum_CC, T_FPB, T_OPB, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
+    def __init__(self, OF, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
+                 P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
                  eta_polytropic_FT, eta_FPB, eta_OPB, eta_cstar, eta_isp, dP_over_Pinj_CC, dP_over_Pinj_OPB,
                  dP_over_Pinj_FPB, CR_FPB, CR_OPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel,
                  cooling_channels_pressure_drop, cooling_channels_temperature_rise, axial_velocity_OT,
                  axial_velocity_FT, mdot_total_0, mdot_crossflow_ox_over_mdot_ox_0, mdot_crossflow_f_over_mdot_f_0,
-                 dP_FP_0, dP_OP_0, lb, ub):
-        """A class to analyse full flow staged combustion cycle.
+                 dP_FP_0, dP_OP_0, mode, ThrustSea=None, P_plenum_CC=None, T_FPB=None, T_OPB=None, lb=None, ub=None,
+                 jac=None, method=None, loss=None, tr_solver=None, xtol=None, ftol=None, fscale=1, diff_step=None):
+        """A class to analyse and size full flow staged combustion cycle.
 
-
-
+        :param string mode: "analysis" or "sizing". Analysis will do cycle calculations for given mdot_total_0,
+         mdot_crossflow_ox_over_mdot_ox_0, mdot_crossflow_f_over_mdot_f_0, dP_FP_0, dP_OP_0. Sizing will use these as
+          first estimate and find values that give desired ThrustSea, P_plenum_CC, T_FPB, T_OPB using
+           scipy.optimize.least_squares
+        :param float or int OF: Oxidizer-to-Fuel ratio of the cycle
+        :param pyfluids.FluidsList oxidizer: PyFluids object representing oxidizer
+        :param pyfluids.FluidsList fuel: PyFluids object representing fuel
+        :param string fuel_CEA_name: CEA name of fuel
+        :param string oxidizer_CEA_name: CEA name of oxidizer
+        :param float or int T_oxidizer: Temperature of inlet oxidizer (K)
+        :param float or int T_fuel: Temperature of inlet fuel (K)
+        :param float or int P_oxidizer: Pressure of inlet oxidizer (bar)
+        :param float or int P_fuel: Pressure of inlet fuel (bar)
+        :param float or int eta_isotropic_OP: Isotropic efficiency of the oxidizer pump (-)
+        :param float or int eta_isotropic_FP: Isotropic efficiency of the fuel pump (-)
+        :param float or int eta_polytropic_OT: Polytropic efficiency of the oxidizer turbine (-)
+        :param float or int eta_polytropic_FT: Polytropic efficiency of the fuel turbine (-)
+        :param float or int eta_FPB: Efficiency of the fuel preburner (-) defined as ratio of actual to ideal
+         temperature
+        :param float or int eta_OPB: Efficiency of the oxidizer preburner (-) defined as ratio of actual to ideal
+         temperature
+        :param float or int eta_cstar: C* efficiency of the CC (-)
+        :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float or int dP_over_Pinj_FPB: Pressure drop ratio for the fuel preburner (-)
+        :param float or int dP_over_Pinj_OPB: Pressure drop ratio for the oxidizer preburner (-)
+        :param float or int dP_over_Pinj_CC: Pressure drop ratio for the combustion chamber (-)
+        :param float or int CR_FPB: Contraction ratio of the fuel preburner (-), used as a measure of its size
+        (as preburner does not usually have a sonic throat)
+        :param float or int CR_OPB: Contraction ratio of the oxidizer preburner (-), used as a measure of its size
+        (as preburner does not usually have a sonic throat)
+        :param float or int CR_CC: Contraction ratio of the combustion chamber (-)
+        :param float or int eps_CC: Expansion ratio of the combustion chamber (-)
+        :param float or int mdot_film_over_mdot_fuel: Ratio of the fuel film cooling massflow to total fuel massflow (-)
+        :param float or int cooling_channels_pressure_drop: Pressure drop in the cooling channels (bar)
+        :param float or int cooling_channels_temperature_rise: Temperature rise in the cooling channels (K)
+        :param float or int axial_velocity_OT: Axial velocity across oxidizer turbine (m/s)
+        :param float or int axial_velocity_FT: Axial velocity across fuel turbine (m/s)
+        :param float or int mdot_total_0: Total massflow (kg/s). In "sizing" mode, first estimate of it.
+        :param float or int mdot_crossflow_f_over_mdot_f_0: Fuel crossflow massflow to fuel massflow (-).
+         In "sizing" mode, first estimate of it.
+        :param float or int mdot_crossflow_ox_over_mdot_ox_0: Oxidizer crossflow massflow to oxidizer massflow (-).
+         In "sizing" mode, first estimate of it.
+        :param float or int dP_FP_0: Pressure rise (bar) in the fuel pump. In "sizing" mode, first estimate of it.
+        :param float or int dP_OP_0: Pressure rise (bar) in the oxidizer pump. In "sizing" mode, first estimate of it.
+        :param float or int ThrustSea: Desired thrust (kN) at the sea level for "sizing" mode.
+        :param float or int P_plenum_CC: Desired CC plenum pressure (bar) for "sizing" mode.
+        :param float or int T_FPB: Desired fuel preburner temperature (K) for "sizing" mode.
+        :param float or int T_OPB: Desired oxidizer preburner temperature (K) for "sizing" mode.
+        :param list lb: A list of lower bounds for variables mdot_total,
+         mdot_crossflow_ox_over_mdot_ox, mdot_crossflow_f_over_mdot_f, dP_FP, dP_OP, when "sizing" mode is used.
+        :param list ub: A list of upper bounds for variables mdot_total,
+         mdot_crossflow_ox_over_mdot_ox, mdot_crossflow_f_over_mdot_f, dP_FP, dP_OP, when "sizing" mode is used.
+        :param string jac: jac argument for scipy.optimize.least_squares
+        :param string method: method argument for scipy.optimize.least_squares
+        :param string loss: loss argument for scipy.optimize.least_squares
+        :param string tr_solver: tr_solver argument for scipy.optimize.least_squares
+        :param float or int xtol: xtol argument for scipy.optimize.least_squares
+        :param float or int ftol: ftol argument for scipy.optimize.least_squares
+        :param float or int fscale: fscale argument for scipy.optimize.least_squares
+        :param float or int diff_step: diff_step argument for scipy.optimize.least_squares
         """
 
         # Assign top level parameters
         self.OF = OF
-        self.ThrustSea = ThrustSea
-        self.P_plenum_CC = P_plenum_CC
 
         # Define propellants
         self.fuel = fuel
@@ -109,10 +166,6 @@ class FFSC_LRE:
         self.T_fuel = T_fuel
         self.P_oxidizer = P_oxidizer
         self.P_fuel = P_fuel
-
-        # Assign temperature constraints
-        self.T_FPB = T_FPB
-        self.T_OPB = T_OPB
 
         # Assign efficiencies
         self.eta_isotropic_OP = eta_isotropic_OP
@@ -142,31 +195,74 @@ class FFSC_LRE:
         self.axial_velocity_OT = axial_velocity_OT
         self.axial_velocity_FT = axial_velocity_FT
 
-        # Solve for parameters of the cycle that satisfy all requirements. First get the non-normalized first solution
-        # estimate (which is also used as reference values). Inputs and outputs are normalized (wrt reference values)
-        # for better convergence, so the first solution estimate needs to be normalized too (it is then just ones).
-        # Also get normalized bounds.
-        self.x_ref = np.array([mdot_total_0, mdot_crossflow_ox_over_mdot_ox_0, mdot_crossflow_f_over_mdot_f_0, dP_FP_0,
-                               dP_OP_0])
-        bounds = (lb / self.x_ref, ub / self.x_ref)
-        x0 = np.ones(5)
+        # Assign required parameters/constraints. (For "analysis" mode these will be just None)
+        self.ThrustSea = ThrustSea
+        self.P_plenum_CC = P_plenum_CC
+        self.T_FPB = T_FPB
+        self.T_OPB = T_OPB
 
-        # Get the solution. Least-squares is used, because it is the only method that would converge.
-        result = opt.least_squares(fun=self.get_residuals, x0=x0, jac="3-point", bounds=bounds,
-                                   method="dogbox", loss="soft_l1", tr_solver="exact", verbose=2)
-        [self.mdot_total, self.mdot_crossflow_ox_over_mdot_ox, self.mdot_crossflow_fuel_over_mdot_fuel, self.dP_FP,
-         self.dP_OP] = result.x * self.x_ref
+        # If mode is analysis, analyse the cycle.
+        if mode == "analysis":
+            # CP stores parameters of the cycle
+            self.CP = (self.analyze_cycle(mdot_total=mdot_total_0,
+                                          mdot_crossflow_ox_over_mdot_ox=mdot_crossflow_ox_over_mdot_ox_0,
+                                          mdot_crossflow_fuel_over_mdot_fuel=mdot_crossflow_f_over_mdot_f_0,
+                                          dP_FP=dP_FP_0, dP_OP=dP_OP_0))
+            # Assign these variables, so that the same get_full_output function can be used for both sizing and
+            # analysis modes. It just means that variables that would be first estimate for sizing mode, are used
+            # as input in analysis mode.
+            self.mdot_total = mdot_total_0
+            self.dP_FP = dP_FP_0
+            self.dP_OP = dP_OP_0
 
-        # Get the remianing parameters stored in CycleParameters object
-        (residual_propellants_dP, residual_thrust, residual_CC_pressure, residual_T_FPB, residual_T_OPB, self.CP) = (
-            self.analyze_cycle(mdot_total=self.mdot_total,
-                               mdot_crossflow_ox_over_mdot_ox=self.mdot_crossflow_ox_over_mdot_ox,
-                               mdot_crossflow_fuel_over_mdot_fuel=self.mdot_crossflow_fuel_over_mdot_fuel,
-                               dP_FP=self.dP_FP, dP_OP=self.dP_OP))
+        # If mode is to size the cycle, find solution that satisfies requirements.
+        elif mode == "sizing":
+            # Solve for parameters of the cycle that satisfy all requirements. First get the non-normalized first
+            # solution estimate (which is also used as reference values). Inputs are normalized (wrt
+            # reference values) for better convergence, so the first solution estimate needs to be normalized too (it
+            # is then just ones). Also get normalized upper and lower bounds.
+            self.x_ref = np.array([mdot_total_0, mdot_crossflow_ox_over_mdot_ox_0, mdot_crossflow_f_over_mdot_f_0,
+                                   dP_FP_0, dP_OP_0])
+            bounds = (lb / self.x_ref, ub / self.x_ref)
+            x0 = np.ones(5)
+
+            # Get initial residuals, both non- and non-normalized. Residuals are also normalized wrt to some reference
+            # scales.
+            self.norm_residuals_0 = self.calculate_residuals(x0)
+            self.residuals_0 = self.norm_residuals_0 * np.array(
+                [self.P_plenum_CC, self.ThrustSea, self.P_plenum_CC, self.T_FPB, self.T_OPB])
+
+            # Get the solution. Least-squares is used, because it is the only method that would converge.
+            # Solution is normalized, so it needs to be scaled again.
+            result = opt.least_squares(fun=self.calculate_residuals, x0=x0, jac=jac, bounds=bounds,
+                                       method=method, loss=loss, tr_solver=tr_solver, xtol=xtol, ftol=ftol,
+                                       f_scale=fscale, verbose=2, diff_step=diff_step, x_scale="jac")
+            [self.mdot_total, self.mdot_crossflow_ox_over_mdot_ox, self.mdot_crossflow_fuel_over_mdot_fuel, self.dP_FP,
+             self.dP_OP] = result.x * self.x_ref
+
+            # Get residuals for the solution, both normalized and non-normalized.
+            self.norm_residuals = self.calculate_residuals(result.x)
+            self.residuals = self.norm_residuals * np.array([self.P_plenum_CC, self.ThrustSea, self.P_plenum_CC,
+                                                             self.T_FPB, self.T_OPB])
+
+            # Get the remaining parameters stored in CycleParameters object
+            self.CP = (self.analyze_cycle(mdot_total=self.mdot_total,
+                                          mdot_crossflow_ox_over_mdot_ox=self.mdot_crossflow_ox_over_mdot_ox,
+                                          mdot_crossflow_fuel_over_mdot_fuel=self.mdot_crossflow_fuel_over_mdot_fuel,
+                                          dP_FP=self.dP_FP, dP_OP=self.dP_OP))
 
     def analyze_cycle(self, mdot_total, mdot_crossflow_ox_over_mdot_ox, mdot_crossflow_fuel_over_mdot_fuel, dP_FP,
                       dP_OP):
-        """A function to analyze the cycle."""
+        """A function to analyze the cycle.
+
+        :param int or float mdot_total: Total massflow (kg/s)
+        :param int or float mdot_crossflow_ox_over_mdot_ox: Oxidizer crossflow massflow to oxidizer massflow (-)
+        :param int or float mdot_crossflow_fuel_over_mdot_fuel: Fuel crossflow massflow to fuel massflow (-)
+        :param int or float dP_FP: Pressure rise (bar) in the fuel pump.
+        :param int or float dP_OP: Pressure rise (bar) in the oxidizer pump.
+
+        :return: ClassParameters object storing data about the cycle.
+        """
 
         # Create an object to store data. Cycle Parameters is used instead of self, such that inner loops in the solver
         # cannot change any global parameters
@@ -179,25 +275,29 @@ class FFSC_LRE:
         CP.mdot_crossflow_oxidizer = mdot_crossflow_ox_over_mdot_ox * CP.mdot_oxidizer
         CP.mdot_crossflow_fuel = mdot_crossflow_fuel_over_mdot_fuel * CP.mdot_fuel
 
-        # Create Pyfluids objects for propellants
+        # Create Pyfluids Fluid objects for propellants with correct units (Pa and deg C)
         CP.fuel = pyfluids.Fluid(self.fuel).with_state(
             pyfluids.Input.pressure(self.P_fuel * 1e5), pyfluids.Input.temperature(self.T_fuel - 273.15))
         CP.oxidizer = pyfluids.Fluid(self.oxidizer).with_state(
             pyfluids.Input.pressure(self.P_oxidizer * 1e5), pyfluids.Input.temperature(self.T_oxidizer - 273.15))
 
-        # First calculate states after pumps. Change oxidizer into RocketCycleFluid object.
+        # First calculate states after pumps and powers required to drive them. For fuel pump:
         CP.pumped_fuel, CP.w_pumped_fuel = RocketCycleElements.calculate_state_after_pump_for_PyFluids(
             fluid=CP.fuel, delta_P=dP_FP, efficiency=self.eta_isotropic_FP)
         CP.Power_FP = CP.w_pumped_fuel * CP.mdot_fuel
 
+        # And for oxidizer pump:
         CP.pumped_oxidizer, CP.w_pumped_oxidizer = RocketCycleElements.calculate_state_after_pump_for_PyFluids(
             fluid=CP.oxidizer, delta_P=dP_OP, efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
+
+        # Change oxidizer into RocketCycleFluid object.
         CP.pumped_oxidizer = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_oxidizer, CEA_name=self.oxidizer_CEA_name,
                                                          type="oxidizer", phase="liquid")
 
         # Go over fuel side of the system. Calculate state after cooling channels and change both heated and pumped
-        # fuel into RocketCycleFluid object. Pumped fuel will be still used later on for oxygen preburner.
+        # fuel into RocketCycleFluid object. Pumped fuel will be still used later on for oxygen preburner,
+        # hence it is changed to RocketCycleFluid.
         CP.heated_fuel, CP.mdot_cooling_channels_outlet = (
             RocketCycleElements.calculate_state_after_cooling_channels_for_Pyfluids(
                 fluid=CP.pumped_fuel, mdot_coolant=CP.mdot_fuel, mdot_film=CP.mdot_film,
@@ -208,10 +308,11 @@ class FFSC_LRE:
         CP.pumped_fuel = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
                                                      phase="liquid")
 
-        # Calculate state after fuel preburner
+        # Calculate state after fuel preburner. First calculate fuel massflow into it and its OF ratio.
         CP.mdot_f_FPB = CP.mdot_cooling_channels_outlet - CP.mdot_crossflow_fuel
         CP.OF_FPB = CP.mdot_crossflow_oxidizer / CP.mdot_f_FPB
-        # For determining preburner pressure, use minimum propellant pressure
+        # For determining preburner pressure, use minimum propellant pressure.
+        # Get results for FPB.
         CP.P_inj_FPB = min(CP.heated_fuel.Pt, CP.pumped_oxidizer.Pt) / (1 + self.dP_over_Pinj_FPB)
         CP.FPB_CEA_output, CP.FPB_products = RocketCycleElements.calculate_state_after_preburner(
             OF=CP.OF_FPB, preburner_inj_pressure=CP.P_inj_FPB, CR=self.CR_FPB,
@@ -225,11 +326,13 @@ class FFSC_LRE:
                 massflow=CP.mdot_FT, turbine_power=CP.Power_FP, turbine_polytropic_efficiency=self.eta_polytropic_FT,
                 preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT))
 
-        # Now go over oxidizer side of the system. Calculate state after oxygen preburner.
+        # Now go over oxidizer side of the system. Calculate state after oxygen preburner. Again first calculate
+        # oxidizer massflow through it and preburner OF.
         CP.mdot_ox_OPB = CP.mdot_oxidizer - CP.mdot_crossflow_oxidizer
         CP.OF_OPB = CP.mdot_ox_OPB / CP.mdot_crossflow_fuel
         # For determining preburner pressure, use minimum propellant pressure
         CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
+        # Get preburner results
         CP.OPB_CEA_output, CP.OPB_products = RocketCycleElements.calculate_state_after_preburner(
             OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
             preburner_eta=self.eta_OPB, fuel=CP.pumped_fuel, oxidizer=CP.pumped_oxidizer)
@@ -242,9 +345,8 @@ class FFSC_LRE:
                 massflow=CP.mdot_OT, turbine_power=CP.Power_OP, turbine_polytropic_efficiency=self.eta_polytropic_OT,
                 preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT))
 
-        # Calculate combustion chamber performance. It does not matter with respect to which propellant pressure we
-        # calculate its CC pressure, as it is imposed that these are the same below. Total pressure is used because
-        # the gas should slow down in the turbine outlet manifold
+        # Calculate combustion chamber performance. CC pressure at injector is determined wrt to minimum propellant
+        # pressure. Total pressure is used because the gas should slow down in the turbine outlet manifold.
         CP.P_inj_CC = min(CP.FT_equilibrium_gas.Pt, CP.OT_equilibrium_gas.Pt) / (1 + self.dP_over_Pinj_CC)
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
          CP.A_t_CC, CP.A_e_CC) = (RocketCycleElements.calculate_combustion_chamber_performance(
@@ -252,8 +354,25 @@ class FFSC_LRE:
             fuel=CP.FT_equilibrium_gas, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
             eta_cstar=self.eta_cstar, eta_isp=self.eta_isp))
 
+        # Return CycleParameters object storing data about cycle
+        return CP
+
+    def calculate_residuals(self, x):
+        """A function to get the residuals, which need to be zero to satisfy all constraints.
+
+        :param np.ndarray x: Normalized estimate of the solution.
+
+        """
+        # Retrieve non-normalized arguments
+        [mdot_total, mdot_crossflow_ox_over_mdot_ox, mdot_crossflow_fuel_over_mdot_fuel, dP_FP, dP_OP] = x * self.x_ref
+
+        # Analyze the cycle
+        CP = (self.analyze_cycle(mdot_total=mdot_total, mdot_crossflow_ox_over_mdot_ox=mdot_crossflow_ox_over_mdot_ox,
+                                 mdot_crossflow_fuel_over_mdot_fuel=mdot_crossflow_fuel_over_mdot_fuel,
+                                 dP_FP=dP_FP, dP_OP=dP_OP))
+
         # Get residuals. These will allow to find input parameters that allow to get feasible cycle.
-        # All residuals are normalized.
+        # All residuals are normalized wrt some reference scales.
         # Calculate pressure difference residual - fuel and oxidizer should be at the same pressure before injection
         # into CC.
         residual_propellants_dP = (CP.FT_equilibrium_gas.Pt - CP.OT_equilibrium_gas.Pt) / self.P_plenum_CC
@@ -268,29 +387,16 @@ class FFSC_LRE:
         residual_T_FPB = (CP.FPB_products.Ts - self.T_FPB) / self.T_FPB
         residual_T_OPB = (CP.OPB_products.Ts - self.T_OPB) / self.T_OPB
 
-        # Return everything
-        return (residual_propellants_dP, residual_thrust, residual_CC_pressure, residual_T_FPB, residual_T_OPB, CP)
-
-    def get_residuals(self, x):
-        """A function to get the residuals, which need to be zero to satisfy all constraints"""
-        # Retrieve arguments
-        [mdot_total, mdot_crossflow_ox_over_mdot_ox, mdot_crossflow_fuel_over_mdot_fuel, dP_FP, dP_OP] = x * self.x_ref
-
-        # Analyze the cycle
-        (residual_propellants_dP, residual_thrust, residual_CC_pressure, residual_T_FPB, residual_T_OPB, CP) = (
-            self.analyze_cycle(mdot_total=mdot_total, mdot_crossflow_ox_over_mdot_ox=mdot_crossflow_ox_over_mdot_ox,
-                               mdot_crossflow_fuel_over_mdot_fuel=mdot_crossflow_fuel_over_mdot_fuel,
-                               dP_FP=dP_FP, dP_OP=dP_OP))
-
-        # Return only the residuals
+        # Return the residuals
         return [residual_propellants_dP, residual_thrust, residual_CC_pressure, residual_T_FPB, residual_T_OPB]
 
     def get_full_output(self):
-        """A function to return the string with the results."""
+        """A function to return the string with data about the cycle."""
         string = \
             (f"\n\n--- INPUT PARAMETERS ---\n"
              f"---Top level parameters---\n"
-             f"O/F: {self.OF}   Thrust: {self.ThrustSea} kN    CC plenum pressure: {self.P_plenum_CC} bar\n"
+             f"O/F: {self.OF}   Required thrust: {self.ThrustSea} kN    "
+             f"Required CC plenum pressure: {self.P_plenum_CC} bar\n"
              f"---Propellants---\n"
              f"Fuel:"
              f"{self.fuel_CEA_name}   Temperature: {self.T_fuel} K   Pressure: {self.P_fuel}\n"
@@ -313,6 +419,7 @@ class FFSC_LRE:
              f"Film cooling massflow to fuel massflow: {self.mdot_film_over_mdot_fuel}\n"
              f"Cooling channels pressure drop: {self.cooling_channels_pressure_drop} bar    "
              f"Cooling channels temperature rise: {self.cooling_channels_temperature_rise} K\n"
+             f"Required OPB temperature: {self.T_OPB} K    Required FPB temperature: {self.T_FPB} K\n"
              f"OPB CR: {self.CR_OPB}    FPB CR: {self.CR_FPB} \n"
              f"OT axial velocity: {self.axial_velocity_OT} m/s      FT axial velocity: {self.axial_velocity_OT} m/s\n\n"
              f"---MASSFLOWS---\n"
@@ -381,5 +488,33 @@ class FFSC_LRE:
              f"---CC CEA Output---\n"
              f"{self.CP.CC_CEA_output}"
              )
+        return string
 
+    def get_residuals(self):
+        """A function to return string about initial and final residuals."""
+
+        string = \
+            (f"\n---INITIAL RESIDUALS---\n"
+             f"- Pressure difference between fuel-rich and oxygen-rich gas in the CC manifold: {self.residuals_0[0]}"
+             f" bar (normalized: {self.norm_residuals_0[0]})\n"
+             f"- Difference between actual and desired sea thrust: {self.residuals_0[1]} kN"
+             f" (normalized: {self.norm_residuals_0[1]})\n"
+             f"- Pressure difference between actual and desired CC plenum pressure: {self.residuals_0[2]} bar"
+             f" (normalized: {self.norm_residuals_0[2]})\n"
+             f"- Temperature difference between actual and desired temperature in FPB: {self.residuals_0[3]} K"
+             f" (normalized: {self.norm_residuals_0[3]})\n"
+             f"- Temperature difference between actual and desired temperature in OPB: {self.residuals_0[4]} K"
+             f" (normalized: {self.norm_residuals_0[4]})\n\n"
+             f"\n---REMAINING RESIDUALS---\n"
+             f"- Pressure difference between fuel-rich and oxygen-rich gas in the CC manifold: {self.residuals[0]} bar"
+             f" (normalized: {self.norm_residuals[0]})\n"
+             f"- Difference between actual and desired sea thrust: {self.residuals[1]} kN"
+             f" (normalized: {self.norm_residuals[1]})\n"
+             f"- Pressure difference between actual and desired CC plenum pressure: {self.residuals[2]} bar"
+             f" (normalized: {self.norm_residuals[2]})\n"
+             f"- Temperature difference between actual and desired temperature in FPB: {self.residuals[3]} K"
+             f" (normalized: {self.norm_residuals[3]})\n"
+             f"- Temperature difference between actual and desired temperature in OPB: {self.residuals[4]} K"
+             f" (normalized: {self.norm_residuals[4]})\n\n"
+             )
         return string
