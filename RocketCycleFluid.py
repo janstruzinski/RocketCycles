@@ -328,8 +328,12 @@ class RocketCycleFluid:
         equilibrium_fluid = RocketCycleFluid(species=list(equilibrium_mass_fractions.keys()),
                                              mass_fractions=list(equilibrium_mass_fractions.values()),
                                              temperature=equilibrium_temperature, type=self.type, phase=self.phase)
-        equilibrium_fluid.Pt = self.Pt                          # bar
-        equilibrium_fluid.Ps = self.Ps  # bar
+        # It is assumed equilibrium gas total and static pressure are the same, because the function is intended for
+        # equilibrium of gas in CC manifold, where velocities should be low. As such velocity is also assumed to be zero
+        # there.
+        equilibrium_fluid.Pt = self.Pt  # bar
+        equilibrium_fluid.Ps = self.Pt  # bar
+        equilibrium_fluid.velocity = 0  # m/s
         equilibrium_fluid.viscosity = viscosity                 # milipoise
         equilibrium_fluid.mass_Cp_equilibrium = Cp_equilibrium  # J / (kg * K)
 
