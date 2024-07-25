@@ -1,4 +1,4 @@
-import RocketCycles as RC
+import cycles as RC
 import pyfluids
 
 # An example of FFSC LRE using SpaceX Raptor engine - first in analysis mode

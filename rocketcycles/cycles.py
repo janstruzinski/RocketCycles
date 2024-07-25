@@ -1,5 +1,5 @@
-import RocketCycleElements
-from RocketCycleFluid import PyFluid_to_RocketCycleFluid
+from rocketcycles import elements
+from rocketcycles.fluid import pyfluid_to_rocket_cycle_fluid
 import pyfluids
 import scipy.optimize as opt
 import numpy as np
@@ -282,31 +282,31 @@ class FFSC_LRE:
             pyfluids.Input.pressure(self.P_oxidizer * 1e5), pyfluids.Input.temperature(self.T_oxidizer - 273.15))
 
         # First calculate states after pumps and powers required to drive them. For fuel pump:
-        CP.pumped_fuel, CP.w_pumped_fuel = RocketCycleElements.calculate_state_after_pump_for_PyFluids(
+        CP.pumped_fuel, CP.w_pumped_fuel = elements.calculate_state_after_pump_for_PyFluids(
             fluid=CP.fuel, delta_P=dP_FP, efficiency=self.eta_isotropic_FP)
         CP.Power_FP = CP.w_pumped_fuel * CP.mdot_fuel
 
         # And for oxidizer pump:
-        CP.pumped_oxidizer, CP.w_pumped_oxidizer = RocketCycleElements.calculate_state_after_pump_for_PyFluids(
+        CP.pumped_oxidizer, CP.w_pumped_oxidizer = elements.calculate_state_after_pump_for_PyFluids(
             fluid=CP.oxidizer, delta_P=dP_OP, efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
 
         # Change oxidizer into RocketCycleFluid object.
-        CP.pumped_oxidizer = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_oxidizer, CEA_name=self.oxidizer_CEA_name,
-                                                         type="oxidizer", phase="liquid")
+        CP.pumped_oxidizer = pyfluid_to_rocket_cycle_fluid(fluid=CP.pumped_oxidizer, CEA_name=self.oxidizer_CEA_name,
+                                                           type="oxidizer", phase="liquid")
 
         # Go over fuel side of the system. Calculate state after cooling channels and change both heated and pumped
         # fuel into RocketCycleFluid object. Pumped fuel will be still used later on for oxygen preburner,
         # hence it is changed to RocketCycleFluid.
         CP.heated_fuel, CP.mdot_cooling_channels_outlet = (
-            RocketCycleElements.calculate_state_after_cooling_channels_for_Pyfluids(
+            elements.calculate_state_after_cooling_channels_for_Pyfluids(
                 fluid=CP.pumped_fuel, mdot_coolant=CP.mdot_fuel, mdot_film=CP.mdot_film,
                 pressure_drop=self.cooling_channels_pressure_drop,
                 temperature_rise=self.cooling_channels_temperature_rise))
-        CP.heated_fuel = PyFluid_to_RocketCycleFluid(fluid=CP.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
-                                                     phase="liquid")
-        CP.pumped_fuel = PyFluid_to_RocketCycleFluid(fluid=CP.pumped_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
-                                                     phase="liquid")
+        CP.heated_fuel = pyfluid_to_rocket_cycle_fluid(fluid=CP.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
+                                                       phase="liquid")
+        CP.pumped_fuel = pyfluid_to_rocket_cycle_fluid(fluid=CP.pumped_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
+                                                       phase="liquid")
 
         # Calculate state after fuel preburner. First calculate fuel massflow into it and its OF ratio.
         CP.mdot_f_FPB = CP.mdot_cooling_channels_outlet - CP.mdot_crossflow_fuel
@@ -314,7 +314,7 @@ class FFSC_LRE:
         # For determining preburner pressure, use minimum propellant pressure.
         # Get results for FPB.
         CP.P_inj_FPB = min(CP.heated_fuel.Pt, CP.pumped_oxidizer.Pt) / (1 + self.dP_over_Pinj_FPB)
-        CP.FPB_CEA_output, CP.FPB_products = RocketCycleElements.calculate_state_after_preburner(
+        CP.FPB_CEA_output, CP.FPB_products = elements.calculate_state_after_preburner(
             OF=CP.OF_FPB, preburner_inj_pressure=CP.P_inj_FPB, CR=self.CR_FPB,
             preburner_eta=self.eta_FPB, fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
 
@@ -322,7 +322,7 @@ class FFSC_LRE:
         CP.mdot_FT = CP.mdot_f_FPB + CP.mdot_crossflow_oxidizer
         (CP.FT_beta_tt, CP.FT_outlet_gas, CP.FT_equilibrium_gas, CP.FT_equilibrium_gas_CEA_output,
          CP.FT_molar_Cp_average, CP.FT_gamma_average) = (
-            RocketCycleElements.calculate_state_after_turbine(
+            elements.calculate_state_after_turbine(
                 massflow=CP.mdot_FT, turbine_power=CP.Power_FP, turbine_polytropic_efficiency=self.eta_polytropic_FT,
                 preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT))
 
@@ -333,7 +333,7 @@ class FFSC_LRE:
         # For determining preburner pressure, use minimum propellant pressure
         CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
         # Get preburner results
-        CP.OPB_CEA_output, CP.OPB_products = RocketCycleElements.calculate_state_after_preburner(
+        CP.OPB_CEA_output, CP.OPB_products = elements.calculate_state_after_preburner(
             OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
             preburner_eta=self.eta_OPB, fuel=CP.pumped_fuel, oxidizer=CP.pumped_oxidizer)
 
@@ -341,7 +341,7 @@ class FFSC_LRE:
         CP.mdot_OT = CP.mdot_ox_OPB + CP.mdot_crossflow_fuel
         (CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output,
          CP.OT_molar_Cp_average, CP.OT_gamma_average) = (
-            RocketCycleElements.calculate_state_after_turbine(
+            elements.calculate_state_after_turbine(
                 massflow=CP.mdot_OT, turbine_power=CP.Power_OP, turbine_polytropic_efficiency=self.eta_polytropic_OT,
                 preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT))
 
@@ -349,7 +349,7 @@ class FFSC_LRE:
         # pressure. Total pressure is used because the gas should slow down in the turbine outlet manifold.
         CP.P_inj_CC = min(CP.FT_equilibrium_gas.Pt, CP.OT_equilibrium_gas.Pt) / (1 + self.dP_over_Pinj_CC)
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = (RocketCycleElements.calculate_combustion_chamber_performance(
+         CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
             mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT, oxidizer=CP.OT_equilibrium_gas,
             fuel=CP.FT_equilibrium_gas, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
             eta_cstar=self.eta_cstar, eta_isp=self.eta_isp))

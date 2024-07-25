@@ -7,7 +7,7 @@ import warnings
 import re
 
 
-def PyFluid_to_RocketCycleFluid(fluid, CEA_name, type, phase):
+def pyfluid_to_rocket_cycle_fluid(fluid, CEA_name, type, phase):
     """A function to create RocketCycleFluid object from PyFluid Fluid.
 
     :param pyfluids.Fluid fluid: PyFluid Fluid object.
