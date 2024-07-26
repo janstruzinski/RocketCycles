@@ -282,12 +282,12 @@ class FFSC_LRE:
             pyfluids.Input.pressure(self.P_oxidizer * 1e5), pyfluids.Input.temperature(self.T_oxidizer - 273.15))
 
         # First calculate states after pumps and powers required to drive them. For fuel pump:
-        CP.pumped_fuel, CP.w_pumped_fuel = elements.calculate_state_after_pump_for_PyFluids(
+        CP.pumped_fuel, CP.w_pumped_fuel = elements.calculate_state_after_pump_for_pyfluids(
             fluid=CP.fuel, delta_P=dP_FP, efficiency=self.eta_isotropic_FP)
         CP.Power_FP = CP.w_pumped_fuel * CP.mdot_fuel
 
         # And for oxidizer pump:
-        CP.pumped_oxidizer, CP.w_pumped_oxidizer = elements.calculate_state_after_pump_for_PyFluids(
+        CP.pumped_oxidizer, CP.w_pumped_oxidizer = elements.calculate_state_after_pump_for_pyfluids(
             fluid=CP.oxidizer, delta_P=dP_OP, efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
 
