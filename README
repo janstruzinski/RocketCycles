@@ -21,6 +21,12 @@ tests.py stores unit tests for the package.
 It is highly recommened that you see the code, so that you know what is happening under the hood and are aware of any
 assumptions.
 
+For installation, do:
+
+<pre class="literal-block">
+pip install rocketcycles
+</pre>
+
 I hope you will find the library useful!
 
 Cheers,
