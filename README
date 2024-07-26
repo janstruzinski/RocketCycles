@@ -23,7 +23,7 @@ assumptions.
 
 For installation, first install nasaPoly from https://github.com/ptgodart/nasaPoly.git
 Then do:
-pip install rocketcycles
+pip3 install git+https://github.com/janstruzinski/RocketCycles.git
 
 I hope you will find the library useful!
 
