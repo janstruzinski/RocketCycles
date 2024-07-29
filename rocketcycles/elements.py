@@ -244,8 +244,8 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
         return outlet_hs - outlet_gas.h0  # kJ / mol
 
     # Solve the function above. Bisection algorithm will be again used for guaranteed convergence. The lower limit is
-    # 100 deg C, the higher limit is inlet gas static temperature.
-    Ts = opt.toms748(calc_enthalpy_residual, a=388.15, b=inlet_gas.Ts, maxiter=1000)  # K
+    # 0 deg C, the higher limit is inlet gas static temperature.
+    Ts = opt.toms748(calc_enthalpy_residual, a=288.15, b=inlet_gas.Ts, maxiter=1000)  # K
 
     # Define gas at the outlet of the current stage
     outlet_gas = RocketCycleFluid(species=inlet_gas.species, mass_fractions=inlet_gas.mass_fractions,
