@@ -298,7 +298,7 @@ class RocketCycleFluid:
         # intended for calculating equilibrium after turbine, where the gas slowed down a lot in the manifold.
 
         # Modify CEA card, such that CEA thinks it is monopropellant.
-        CEA_card = self.CEA_card.replace("oxid", "name")
+        CEA_card = self.CEA_card.replace("oxidizer", "name")
         CEA_card = CEA_card.replace("fuel", "name")
 
         # First create a CEA object with Imperial units, such that full output can be obtained
