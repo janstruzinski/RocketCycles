@@ -64,8 +64,8 @@ def calculate_state_after_pump(fluid, delta_P, efficiency):
     return fluid, w_total
 
 
-def calculate_state_after_preburner(OF, preburner_inj_pressure, CR, preburner_eta,
-                                    fuel=None, oxidizer=None, monopropellant=None):
+def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
+                                    fuel=None, oxidizer=None, monopropellant=None, OF=None):
     """A function to calculate the state of the combustion product mixture in the preburner based on inflow
     propellants.
 
@@ -74,7 +74,7 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, CR, preburner_et
     :param RocketCycleFluid monopropellant: RocketCycleFluid object representing monopropellant (if used instead of
      oxidizer and fuel)
     :param float or int preburner_eta: Combustor efficiency (-), which is the ratio of delivered to ideal temperature
-    :param float or int OF: Oxidizer-to-Fuel ratio
+    :param float or int OF: Oxidizer-to-Fuel ratio. Only needed if fuel and oxidizer are used.
     :param float or int preburner_inj_pressure: Preburner pressure at the injector face
     :param float or int CR: "Contraction ratio" of the preburner, which is used as a measure of its cross-sectional
      area in order to model Rayleigh line loss.
@@ -101,6 +101,22 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, CR, preburner_et
         warnings.simplefilter("error", UserWarning)
         warnings.warn("Wrong input for fuel and oxidizer, or monopropellant")
 
+    # Raise an error if fuel and oxidizer are used, but OF is not assigned
+    if fuel is not None and oxidizer is not None and OF is None:
+        warnings.simplefilter("error", UserWarning)
+        warnings.warn("OF was not assigned for given fuel - oxidizer combination")
+
+    # OF ratio of the preburner is used to determine if products gases are fuel or oxidizer rich. However,
+    # for monopropellant, OF is None. Therefore, to keep the same code for both fuel-oxidizer and monopropellant,
+    # OF needs to be changed to above 1 or below 1 depending on monopropellant. It is just an artificial value then
+    # that allows to determine if the condition is True or False, without any physical meaning. It is still passed to
+    # all CEA functions (again to use the same code everywhere), but it is not used inside of them.
+    if monopropellant is not None:
+        if monopropellant.type == "fuel":
+            OF = 0.5
+        elif monopropellant.type == "oxid":
+            OF = 2
+
     # Get the full CEA output, the combustion products' composition, plenum pressure, temperature and specific heat
     # in the combustor. To get full CEA output as a string, CEA object that is not a SI units wrapper needs to be
     # created (as the wrapper does not have such function).  It is also used to get products velocity at the end of
@@ -109,7 +125,7 @@ def calculate_state_after_preburner(OF, preburner_inj_pressure, CR, preburner_et
         preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
     elif monopropellant is not None:
         preburner = rcea.CEA_Obj(propName="monoprop card", fac_CR=CR)
-    preburner_CEA_output = preburner.get_full_cea_output(Pc=preburner_inj_pressure, MR=OF, pc_units="bar", output="si",
+    preburner_CEA_output = preburner.get_full_cea_output(MR=OF, Pc=preburner_inj_pressure, pc_units="bar", output="si",
                                                          short_output=1)
     # To get sonic velocity and Mach number at the end of preburner, pressure in psia needs to be used, as SI Units
     # wrapper does not have these functions.
