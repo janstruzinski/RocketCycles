@@ -13,7 +13,8 @@ def pyfluid_to_rocket_cycle_fluid(fluid, CEA_name, type, phase):
     :param pyfluids.Fluid fluid: PyFluid Fluid object.
     :param str CEA_name: String representing CEA equivalent name of Fluid (for example: "CH4" in case "Methane" fluid).
     :param str type: "oxid" for oxidizer or "fuel" for fuel.
-    :param str phase: String describing phase of Fluid. "gas" of gas-like properties or "liquid" for liquid-like properties.
+    :param str phase: String describing phase of Fluid. "gas" of gas-like properties or "liquid" for liquid-like
+     properties.
 
     :return: RocketCycleFluid object equivalent of Fluid passed.
     """
@@ -21,7 +22,9 @@ def pyfluid_to_rocket_cycle_fluid(fluid, CEA_name, type, phase):
     propellant = RocketCycleFluid(species=[CEA_name], mass_fractions=[1], type=type,
                                   temperature=fluid.temperature + 273.15, phase=phase)
     propellant.Ps = fluid.pressure / 1e5
-    propellant.Pt = propellant.Ps
+    # If phase is liquid, total pressure is the same as static pressure
+    if phase == "liquid":
+        propellant.Pt = propellant.Ps
     propellant.density = fluid.density
 
     return propellant
@@ -71,9 +74,10 @@ class RocketCycleFluid:
         :param float or int density: An optional float to represent assigned fluid density (in kg/m^3). Only for
             "liquid" phase, for gas it can be calculated.
         :param list species_molar_Cp: A list of molar heat capacities (in J/mol-K) for individual species needs to be
-         provided if there is any liquified gas, like O2(L), CH4(L), H2(L) or C3H8(L). This is because NASA 9
-         Polynomials do not provide them. For any species that are not liquified gases, corresponding entry in the list
-         can be anything, as Cp will be then obtained from NASA 9 Polynomials then.
+         provided if there is any liquified gas, like O2(L), CH4(L), H2(L) or C3H8(L), and some hydrocarbons like RP-1
+          or JP-10(L). This is because NASA 9 Polynomials do not provide them. For any species that are not liquified
+           gases or mentioned hydrocarbons, corresponding entry in the list can be anything, as Cp will be then obtained
+            from NASA 9 Polynomials.
         """
 
         # Assign properties
@@ -248,8 +252,9 @@ class RocketCycleFluid:
             # before the capital letter and there are multiple zeros at the end of formula. This needs to be fixed
             # Add the space
             chemical_formula = re.sub(r"(\w)([A-Z])", r"\1   \2", chemical_formula)
-            # Remove the zeros
-            chemical_formula = re.sub('0.00', '', chemical_formula)
+            # Remove the zeros. There must be a space before 0.00 such that, for example, 10.00 is not stripped of
+            # zeros.
+            chemical_formula = re.sub(' 0.00', '', chemical_formula)
             # Strip whitespaces at the end and the beginning
             chemical_formula = chemical_formula.strip()
             # For each species create card string and add it to CEA card string

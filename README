@@ -22,7 +22,17 @@ It is highly recommened that you see the code, so that you know what is happenin
 assumptions.
 
 For installation, first install nasaPoly from https://github.com/ptgodart/nasaPoly.git
-Then do:
+
+To add JP-10 and RP-1, find raw.dat in nasaPoly installation directory and add the following data to other species:
+
+JP-10(L)          Exo-tetrahydrodicyclopentadiene. Smith,1979.
+ 0 g 6/01 C  10.00H  16.00    0.00    0.00    0.00 0   136.234040    -122800.400
+    298.150      0.0000  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0            0.000
+RP-1              Mehta et.al. AIAA 95-2962 1995. Hcomb(high) = 19923.BTU/#
+ 0 gll/00 C   1.00H   1.95    0.00    0.00    0.00 1   13.9761830     -24717.700
+    298.150      0.0000  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0            0.000
+
+To install RocketCycles, do:
 pip3 install git+https://github.com/janstruzinski/RocketCycles.git
 
 I hope you will find the library useful!
