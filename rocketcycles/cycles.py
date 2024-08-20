@@ -94,8 +94,8 @@ class CycleParameters:
 class FFSC_LRE:
     def __init__(self, OF, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
                  P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
-                 eta_polytropic_FT, eta_FPB, eta_OPB, eta_cstar, eta_isp, dP_over_Pinj_CC, dP_over_Pinj_OPB,
-                 dP_over_Pinj_FPB, CR_FPB, CR_OPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel,
+                 eta_polytropic_FT, eta_FPB, eta_OPB, eta_cstar, eta_isp, Ps_Pt_OT, Ps_Pt_FT, dP_over_Pinj_CC,
+                 dP_over_Pinj_OPB, dP_over_Pinj_FPB, CR_FPB, CR_OPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel,
                  cooling_channels_pressure_drop, cooling_channels_temperature_rise, axial_velocity_OT,
                  axial_velocity_FT, mdot_total_0, mdot_crossflow_f_over_mdot_f_0,
                  dP_FP_0, mode, mdot_crossflow_ox_over_mdot_ox_0=None, dP_OP_0=None, ThrustSea=None, P_plenum_CC=None,
@@ -127,6 +127,10 @@ class FFSC_LRE:
          temperature
         :param float or int eta_cstar: C* efficiency of the CC (-)
         :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
+         recovered in diffuser and manifold after turbine (-)
+        :param float Ps_Pt_FT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
+         recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_FPB: Pressure drop ratio for the fuel preburner (-)
         :param float or int dP_over_Pinj_OPB: Pressure drop ratio for the oxidizer preburner (-)
         :param float or int dP_over_Pinj_CC: Pressure drop ratio for the combustion chamber (-)
@@ -208,6 +212,8 @@ class FFSC_LRE:
         self.eta_OPB = eta_OPB
         self.eta_cstar = eta_cstar
         self.eta_isp = eta_isp
+        self.Ps_Pt_OT = Ps_Pt_OT
+        self.Ps_Pt_FT = Ps_Pt_FT
 
         # Assign pressure drops
         self.dP_over_Pinj_CC = dP_over_Pinj_CC
@@ -390,7 +396,8 @@ class FFSC_LRE:
          CP.FT_molar_Cp_average, CP.FT_gamma_average) = (
             elements.calculate_state_after_turbine(
                 massflow=CP.mdot_FT, turbine_power=CP.Power_FP, turbine_polytropic_efficiency=self.eta_polytropic_FT,
-                preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT))
+                preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT,
+                pressure_recovery_factor=self.Ps_Pt_FT))
 
         # Now go over oxidizer side of the system. Calculate state after oxygen preburner. Again first calculate
         # oxidizer massflow through it and preburner OF.
@@ -409,11 +416,12 @@ class FFSC_LRE:
          CP.OT_molar_Cp_average, CP.OT_gamma_average) = (
             elements.calculate_state_after_turbine(
                 massflow=CP.mdot_OT, turbine_power=CP.Power_OP, turbine_polytropic_efficiency=self.eta_polytropic_OT,
-                preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT))
+                preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT,
+                pressure_recovery_factor=self.Ps_Pt_OT))
 
         # Calculate combustion chamber performance. CC pressure at injector is determined wrt to minimum propellant
         # pressure. Total pressure is used because the gas should slow down in the turbine outlet manifold.
-        CP.P_inj_CC = min(CP.FT_equilibrium_gas.Pt, CP.OT_equilibrium_gas.Pt) / (1 + self.dP_over_Pinj_CC)
+        CP.P_inj_CC = min(CP.FT_equilibrium_gas.Ps, CP.OT_equilibrium_gas.Ps) / (1 + self.dP_over_Pinj_CC)
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
          CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
             mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT, oxidizer=CP.OT_equilibrium_gas,
@@ -473,6 +481,8 @@ class FFSC_LRE:
              f" - OPB efficiency: {self.eta_OPB}\n"
              f" - C* efficiency: {self.eta_cstar}   "
              f" - Isp efficiency: {self.eta_isp}\n"
+             f" - OT pressure recovery factor: {self.Ps_Pt_OT}"
+             f" - FT pressure recovery factor: {self.Ps_Pt_FT}\n"
              f"---Pressure drop ratios---\n"
              f"Over CC injector: {self.dP_over_Pinj_CC}     Over OPB injector:{self.dP_over_Pinj_OPB}       "
              f"Over FPB injector:{self.dP_over_Pinj_FPB}\n"
@@ -510,8 +520,8 @@ class FFSC_LRE:
              f"Outlet gas total tempetature: {self.CP.FT_outlet_gas.Tt} K\n"
              f"Outlet gas static pressure: {self.CP.FT_outlet_gas.Ps} bar  "
              f"Outlet gas total pressure: {self.CP.FT_outlet_gas.Pt} bar\n"
-             f"Gas temperature in CC manifold: {self.CP.FT_equilibrium_gas.Ts} K  "
-             f"Gas temperature pressure in CC manifold: {self.CP.FT_equilibrium_gas.Pt} bar\n\n"
+             f"Gas static temperature in CC manifold: {self.CP.FT_equilibrium_gas.Ts} K  "
+             f"Gas static pressure in CC manifold: {self.CP.FT_equilibrium_gas.Ps} bar\n\n"
              f"---OXIDIZER SIDE---\n"
              f"---Oxidizer pump---\n"
              f"OP pressure rise: {self.CP.dP_OP} bar   "
@@ -530,8 +540,8 @@ class FFSC_LRE:
              f"Outlet gas total tempetature: {self.CP.OT_outlet_gas.Tt} K\n"
              f"Outlet gas static pressure: {self.CP.OT_outlet_gas.Ps} bar  "
              f"Outlet gas total pressure: {self.CP.OT_outlet_gas.Pt} bar\n"
-             f"Gas temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
-             f"Gas temperature pressure in CC manifold: {self.CP.OT_equilibrium_gas.Pt} bar\n\n"
+             f"Gas static temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
+             f"Gas static pressure in CC manifold: {self.CP.OT_equilibrium_gas.Ps} bar\n\n"
              f"---COMBUSTION CHAMBER---\n"
              f"Pressure at injector: {self.CP.P_inj_CC} bar   Plenum pressure: {self.CP.P_plenum_CC} bar "
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"
@@ -577,7 +587,7 @@ class FFSC_LRE:
 class ORSC_LRE:
     def __init__(self, OF, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
                  P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_isotropic_BFP, eta_polytropic_OT,
-                 eta_OPB, eta_cstar, eta_isp, dP_over_Pinj_CC, dP_over_Pinj_OPB, CR_OPB, CR_CC, eps_CC,
+                 eta_OPB, eta_cstar, eta_isp, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_OPB, CR_OPB, CR_CC, eps_CC,
                  mdot_film_over_mdot_fuel, cooling_channels_pressure_drop, cooling_channels_temperature_rise,
                  axial_velocity_OT, mdot_total_0, dP_FP_0, dP_OP_0, mode, mdot_crossflow_f_over_mdot_f_0=None,
                  ThrustSea=None, P_plenum_CC=None, T_OPB=None, lb=None, ub=None, jac=None, method=None, loss=None,
@@ -606,6 +616,8 @@ class ORSC_LRE:
          temperature
         :param float or int eta_cstar: C* efficiency of the CC (-)
         :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
+         recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_OPB: Pressure drop ratio for the oxidizer preburner (-)
         :param float or int dP_over_Pinj_CC: Pressure drop ratio for the combustion chamber (-)
         :param float or int CR_OPB: Contraction ratio of the oxidizer preburner (-), used as a measure of its size
@@ -678,6 +690,7 @@ class ORSC_LRE:
         self.eta_OPB = eta_OPB
         self.eta_cstar = eta_cstar
         self.eta_isp = eta_isp
+        self.Ps_Pt_OT = Ps_Pt_OT
 
         # Assign pressure drops
         self.dP_over_Pinj_CC = dP_over_Pinj_CC
@@ -840,7 +853,7 @@ class ORSC_LRE:
             elements.calculate_state_after_turbine(
                 massflow=CP.mdot_OT, turbine_power=CP.OT_shaft_power,
                 turbine_polytropic_efficiency=self.eta_polytropic_OT, preburner_products=CP.OPB_products,
-                turbine_axial_velocity=self.axial_velocity_OT))
+                turbine_axial_velocity=self.axial_velocity_OT, pressure_recovery_factor=self.Ps_Pt_OT))
 
         # Calculate state after cooling channels and change heated fuel into RocketCycleFluid object.
         CP.mdot_cooling_channels_inlet = CP.mdot_fuel - CP.mdot_crossflow_fuel
@@ -860,7 +873,7 @@ class ORSC_LRE:
         # However, for analysis mode, the smaller pressure must be taken (so that CC pressure is always smaller than the
         # injected propellant pressure)
         elif self.mode == "analysis":
-            CP.P_inj_CC = min(CP.OT_equilibrium_gas.Pt, CP.heated_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
+            CP.P_inj_CC = min(CP.OT_equilibrium_gas.Ps, CP.heated_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
          CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
@@ -893,7 +906,7 @@ class ORSC_LRE:
 
         # Get propellants pressure difference in the manifold residual. It is desirable that these are the same to
         # limit pressure drops
-        residual_dP_propellants = (CP.heated_fuel.Pt - CP.OT_equilibrium_gas.Pt) / self.P_plenum_CC
+        residual_dP_propellants = (CP.heated_fuel.Pt - CP.OT_equilibrium_gas.Ps) / self.P_plenum_CC
 
         # Return the residuals
         return [residual_thrust, residual_CC_pressure, residual_dP_propellants]
@@ -918,6 +931,7 @@ class ORSC_LRE:
              f" - OPB efficiency: {self.eta_OPB}    "
              f" - C* efficiency: {self.eta_cstar}   "
              f" - Isp efficiency: {self.eta_isp}\n"
+             f" - OT pressure recovery factor: {self.Ps_Pt_OT}\n"
              f"---Pressure drop ratios---\n"
              f"Over CC injector: {self.dP_over_Pinj_CC}     Over OPB injector:{self.dP_over_Pinj_OPB}\n"
              f"---Other parameters---\n"
@@ -962,8 +976,8 @@ class ORSC_LRE:
              f"Outlet gas total tempetature: {self.CP.OT_outlet_gas.Tt} K\n"
              f"Outlet gas static pressure: {self.CP.OT_outlet_gas.Ps} bar  "
              f"Outlet gas total pressure: {self.CP.OT_outlet_gas.Pt} bar\n"
-             f"Gas temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
-             f"Gas temperature pressure in CC manifold: {self.CP.OT_equilibrium_gas.Pt} bar\n\n"
+             f"Gas static temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
+             f"Gas static pressure in CC manifold: {self.CP.OT_equilibrium_gas.Ps} bar\n\n"
              f"---COMBUSTION CHAMBER---\n"
              f"Pressure at injector: {self.CP.P_inj_CC} bar   Plenum pressure: {self.CP.P_plenum_CC} bar "
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"
@@ -1004,7 +1018,7 @@ class ORSC_LRE:
 
 class ClosedCatalyst_LRE:
     def __init__(self, OF, oxidizer, fuel, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
-                 eta_catalyst, eta_cstar, eta_isp, dP_over_Pinj_CC, dP_over_Pinj_catalyst, CR_catalyst,
+                 eta_catalyst, eta_cstar, eta_isp, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_catalyst, CR_catalyst,
                  CR_CC, eps_CC, mdot_film_over_mdot_oxid, cooling_channels_pressure_drop,
                  cooling_channels_temperature_rise, axial_velocity_OT, mdot_total_0, dP_FP_0, dP_OP_0, mode,
                  ThrustSea=None, P_plenum_CC=None, lb=None, ub=None, jac=None, method=None, loss=None,
@@ -1026,6 +1040,8 @@ class ClosedCatalyst_LRE:
          temperature (as not all of H2O2 will be decomposed)
         :param float or int eta_cstar: C* efficiency of the CC (-)
         :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
+         recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_catalyst: Total pressure drop ratio for the catalyst, across the injector and
          the catalyst itself(-)
         :param float or int dP_over_Pinj_CC: Pressure drop ratio for the combustion chamber (-)
@@ -1080,6 +1096,7 @@ class ClosedCatalyst_LRE:
         self.eta_catalyst = eta_catalyst
         self.eta_cstar = eta_cstar
         self.eta_isp = eta_isp
+        self.Ps_Pt_OT = Ps_Pt_OT
 
         # Assign pressure drops
         self.dP_over_Pinj_CC = dP_over_Pinj_CC
@@ -1195,17 +1212,17 @@ class ClosedCatalyst_LRE:
             elements.calculate_state_after_turbine(
                 massflow=CP.mdot_OT, turbine_power=CP.OT_shaft_power,
                 turbine_polytropic_efficiency=self.eta_polytropic_OT, preburner_products=CP.catalyst_products,
-                turbine_axial_velocity=self.axial_velocity_OT))
+                turbine_axial_velocity=self.axial_velocity_OT, pressure_recovery_factor=self.Ps_Pt_OT))
 
         # Calculate combustion chamber performance. For sizing mode, it does not matter wrt which propellant CC pressure
         # at injector is established, as it will be imposed by the residuals that their total pressure is the same.
-        # Using consitent pressure will help with potential seesaw effect in the solver.
+        # Using consistent pressure will help with potential seesaw effect in the solver.
         if self.mode == "sizing":
-            CP.P_inj_CC = CP.OT_equilibrium_gas.Pt / (1 + self.dP_over_Pinj_CC)
+            CP.P_inj_CC = CP.OT_equilibrium_gas.Ps / (1 + self.dP_over_Pinj_CC)
         # However, for analysis mode, the smaller pressure must be taken (so that CC pressure is always smaller than the
         # injected propellant pressure)
         elif self.mode == "analysis":
-            CP.P_inj_CC = min(CP.OT_equilibrium_gas.Pt, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
+            CP.P_inj_CC = min(CP.OT_equilibrium_gas.Ps, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
          CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
@@ -1238,7 +1255,7 @@ class ClosedCatalyst_LRE:
 
         # Get propellants pressure difference in the manifold residual. It is desirable that these are the same to
         # limit pressure drops
-        residual_dP_propellants = (CP.pumped_fuel.Pt - CP.OT_equilibrium_gas.Pt) / self.P_plenum_CC
+        residual_dP_propellants = (CP.pumped_fuel.Pt - CP.OT_equilibrium_gas.Ps) / self.P_plenum_CC
 
         # Return the residuals
         return [residual_thrust, residual_CC_pressure, residual_dP_propellants]
@@ -1262,6 +1279,7 @@ class ClosedCatalyst_LRE:
              f" - Catalyst efficiency: {self.eta_catalyst}    "
              f" - C* efficiency: {self.eta_cstar}   "
              f" - Isp efficiency: {self.eta_isp}\n"
+             f" - OT pressure recovery factor: {self.Ps_Pt_OT}\n"
              f"---Pressure drop ratios---\n"
              f"Over CC injector: {self.dP_over_Pinj_CC}     "
              f"Over catalyst (bed + injector):{self.dP_over_Pinj_catalyst}\n"
@@ -1302,8 +1320,8 @@ class ClosedCatalyst_LRE:
              f"Outlet gas total tempetature: {self.CP.OT_outlet_gas.Tt} K\n"
              f"Outlet gas static pressure: {self.CP.OT_outlet_gas.Ps} bar  "
              f"Outlet gas total pressure: {self.CP.OT_outlet_gas.Pt} bar\n"
-             f"Gas temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
-             f"Gas pressure in CC manifold: {self.CP.OT_equilibrium_gas.Pt} bar\n\n"
+             f"Gas static temperature in CC manifold: {self.CP.OT_equilibrium_gas.Ts} K  "
+             f"Gas static pressure in CC manifold: {self.CP.OT_equilibrium_gas.Ps} bar\n\n"
              f"---COMBUSTION CHAMBER---\n"
              f"Pressure at injector: {self.CP.P_inj_CC} bar   Plenum pressure: {self.CP.P_plenum_CC} bar "
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"

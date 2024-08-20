@@ -104,7 +104,7 @@ class TestRocketCycleFluid(unittest.TestCase):
         # Get temperature of combustion from RocketCycleFluid
         fluid = RocketCycleFluid(species=["O2", "H2"], mass_fractions=[0.5, 0.5], temperature=298.15, type="name",
                                  phase="gas")
-        fluid.Pt = 1  # bar
+        fluid.Ps = 1  # bar
         equilibrium_fluid, equilibrium_output = fluid.equilibrate()
 
         # Compare temperatures
@@ -176,7 +176,7 @@ class TestRocketCycleElements(unittest.TestCase):
             elements.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
                                                    turbine_polytropic_efficiency=0.85,
                                                    preburner_products=inlet_gas,
-                                                   turbine_axial_velocity=223.293))
+                                                   turbine_axial_velocity=223.293, pressure_recovery_factor=1.0))
         actual_w_specific = outlet_gas.h0 - inlet_gas.h0  # kJ / mol
 
         # Calculate manually the desired enthalpy difference

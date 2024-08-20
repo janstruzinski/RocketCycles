@@ -190,7 +190,7 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
 
 
 def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_efficiency, preburner_products,
-                                  turbine_axial_velocity):
+                                  turbine_axial_velocity, pressure_recovery_factor):
     """A function to calculate the pressure ratio of the turbine and the state of the propellant after it passes
     the turbine.
 
@@ -198,7 +198,9 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     :param int or float turbine_power:  A shaft power turbine needs to deliver (W)
     :param int or float turbine_polytropic_efficiency:  Polytropic efficiency of the turbine (from 0 to 1)
     :param RocketCycleFluid preburner_products:  RocketCycleFluid object representing preburner products at its end
-    :param int or float turbine_axial_velocity: Axial velocity through the turbine
+    :param int or float turbine_axial_velocity: Axial velocity (m/s) through the turbine
+    :param float pressure_recovery_factor: Static to total pressure ratio that the diffuser and manifold after turbine
+     allow to recover.
 
     :return: Turbine pressure ratio, RocketCycleFluid representing outlet gas,
     RocketCycleFluid representing equilibrated outlet gas, CEA full output for equilibrated outlet gas
@@ -285,12 +287,12 @@ def calculate_state_after_turbine(massflow, turbine_power, turbine_polytropic_ef
     beta_tt = (inlet_gas.Tt / outlet_gas.Tt) ** (gamma_average /
                                                  (turbine_polytropic_efficiency * (gamma_average - 1)))
 
-    # Calculate pressures at the outlet. This time use gamma at outlet, as static to
-    # total properties are isentropic process at that location (and not across the turbine).
+    # Calculate pressures at the outlet using beta_tt and pressure recovery factor.
     outlet_gas.Pt = inlet_gas.Pt / beta_tt  # bar
-    outlet_gas.calculate_static_from_total_pressure()
+    outlet_gas.Ps = outlet_gas.Pt * pressure_recovery_factor
 
-    # After the turbine outlet, perform equilibrium
+    # After the turbine outlet, apply pressure recovery factor and perform equilibrium
+
     equilibrium_gas, equilibrium_CEA_output = outlet_gas.equilibrate()
 
     # Return turbine calculations results

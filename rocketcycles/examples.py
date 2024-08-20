@@ -8,8 +8,8 @@ Raptor = RC.FFSC_LRE(OF=3.6, oxidizer=pyfluids.FluidsList.Oxygen, fuel=pyfluids.
                      fuel_CEA_name="CH4(L)", oxidizer_CEA_name="O2(L)", T_oxidizer=80, T_fuel=100, P_oxidizer=4,
                      P_fuel=4, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
                      eta_polytropic_OT=0.9, eta_polytropic_FT=0.9, eta_FPB=0.99, eta_OPB=0.99, eta_cstar=0.99,
-                     eta_isp=0.95, dP_over_Pinj_CC=0.15, dP_over_Pinj_OPB=0.15, dP_over_Pinj_FPB=0.15, CR_CC=2.5,
-                     CR_FPB=4, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
+                     eta_isp=0.95, Ps_Pt_FT=0.9, Ps_Pt_OT=0.9, dP_over_Pinj_CC=0.15, dP_over_Pinj_OPB=0.15,
+                     dP_over_Pinj_FPB=0.15, CR_CC=2.5, CR_FPB=4, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
                      cooling_channels_pressure_drop=190, cooling_channels_temperature_rise=100, axial_velocity_OT=200,
                      axial_velocity_FT=300, mdot_total_0=710, mdot_crossflow_ox_over_mdot_ox_0=0.075,
                      mdot_crossflow_f_over_mdot_f_0=0.045, dP_FP_0=880, dP_OP_0=690, mode="analysis")
@@ -21,10 +21,10 @@ print(f"Temperature of combustion in CC is: {Raptor.CP.CC_Tcomb} K")
 # Now in sizing mode:
 Raptor = RC.FFSC_LRE(OF=3.6, ThrustSea=2230, oxidizer=pyfluids.FluidsList.Oxygen, fuel=pyfluids.FluidsList.Methane,
                      fuel_CEA_name="CH4(L)", oxidizer_CEA_name="O2(L)", T_oxidizer=80, T_fuel=100, P_oxidizer=4,
-                     P_fuel=4, P_plenum_CC=300, T_FPB=860, T_OPB=760, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
+                     P_fuel=4, P_plenum_CC=300, T_FPB=900, T_OPB=900, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
                      eta_polytropic_OT=0.9, eta_polytropic_FT=0.9, eta_FPB=0.99, eta_OPB=0.99, eta_cstar=0.99,
-                     eta_isp=0.95, dP_over_Pinj_CC=0.15, dP_over_Pinj_OPB=0.15, dP_over_Pinj_FPB=0.15, CR_CC=2.5,
-                     CR_FPB=4, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
+                     eta_isp=0.95, dP_over_Pinj_CC=0.14, dP_over_Pinj_OPB=0.14, dP_over_Pinj_FPB=0.14, CR_CC=2.5,
+                     CR_FPB=4, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05, Ps_Pt_OT=0.95, Ps_Pt_FT=0.95,
                      cooling_channels_pressure_drop=190, cooling_channels_temperature_rise=100, axial_velocity_OT=200,
                      axial_velocity_FT=300, mdot_total_0=710, mdot_crossflow_f_over_mdot_f_0=0.045, dP_FP_0=880,
                      lb=[510, 0.04, 680], ub=[910, 0.1, 1080], jac="3-point", method="dogbox", loss="soft_l1",
@@ -35,7 +35,7 @@ print(Raptor.get_residuals())
 # An example of ORSC LRE using Propalox - first in analysis mode
 orsc_engine = RC.ORSC_LRE(OF=3.6, oxidizer=pyfluids.FluidsList.Oxygen, fuel=pyfluids.FluidsList.nPropane,
                           fuel_CEA_name="C3H8(L)", oxidizer_CEA_name="O2(L)", T_oxidizer=80, T_fuel=90, P_oxidizer=4,
-                          P_fuel=4, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84, eta_isotropic_BFP=0.84,
+                          P_fuel=4, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84, eta_isotropic_BFP=0.84, Ps_Pt_OT=0.9,
                           eta_polytropic_OT=0.9, eta_OPB=0.99, eta_cstar=0.99, eta_isp=0.95, dP_over_Pinj_CC=0.15,
                           dP_over_Pinj_OPB=0.15, CR_CC=2.5, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
                           cooling_channels_pressure_drop=190, cooling_channels_temperature_rise=100,
@@ -46,7 +46,7 @@ print(orsc_engine.get_full_output())
 # Now in sizing mode
 orsc_engine = RC.ORSC_LRE(OF=3.6, oxidizer=pyfluids.FluidsList.Oxygen, fuel=pyfluids.FluidsList.nPropane,
                           fuel_CEA_name="C3H8(L)", oxidizer_CEA_name="O2(L)", T_oxidizer=80, T_fuel=90, P_oxidizer=4,
-                          P_fuel=4, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84, eta_isotropic_BFP=0.84,
+                          P_fuel=4, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84, eta_isotropic_BFP=0.84, Ps_Pt_OT=0.9,
                           eta_polytropic_OT=0.9, eta_OPB=0.99, eta_cstar=0.99, eta_isp=0.95, dP_over_Pinj_CC=0.15,
                           dP_over_Pinj_OPB=0.15, CR_CC=2.5, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
                           cooling_channels_pressure_drop=190, cooling_channels_temperature_rise=100,
@@ -75,7 +75,7 @@ JP10.Ps = 3  # bar
 JP10.density = 931.8  # kg/m^3
 
 Draper = RC.ClosedCatalyst_LRE(OF=6.75, oxidizer=H2O2, fuel=JP10, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
-                               eta_polytropic_OT=0.9, eta_catalyst=0.99, eta_cstar=0.99, eta_isp=0.95,
+                               eta_polytropic_OT=0.9, eta_catalyst=0.99, eta_cstar=0.99, eta_isp=0.95, Ps_Pt_OT=0.9,
                                dP_over_Pinj_CC=0.15, dP_over_Pinj_catalyst=0.05, CR_CC=2.5, CR_catalyst=4, eps_CC=35,
                                mdot_film_over_mdot_oxid=0.02, cooling_channels_pressure_drop=15,
                                cooling_channels_temperature_rise=100, axial_velocity_OT=400, mdot_total_0=10,
@@ -84,7 +84,7 @@ print(Draper.get_full_output())
 
 # Now in sizing mode
 Draper = RC.ClosedCatalyst_LRE(OF=7, oxidizer=H2O2, fuel=JP10, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
-                               eta_polytropic_OT=0.9, eta_catalyst=0.99, eta_cstar=0.99, eta_isp=0.95,
+                               eta_polytropic_OT=0.9, eta_catalyst=0.99, eta_cstar=0.99, eta_isp=0.95, Ps_Pt_OT=0.9,
                                dP_over_Pinj_CC=0.15, dP_over_Pinj_catalyst=0.05, CR_CC=2.5, CR_catalyst=4, eps_CC=35,
                                mdot_film_over_mdot_oxid=0.05, cooling_channels_pressure_drop=15,
                                cooling_channels_temperature_rise=100, axial_velocity_OT=400, mdot_total_0=4,

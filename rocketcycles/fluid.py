@@ -309,7 +309,7 @@ class RocketCycleFluid:
         # First create a CEA object with Imperial units, such that full output can be obtained
         rcea.add_new_propellant(name="equilibrium card", card_str=CEA_card)
         equilibrium = rcea.CEA_Obj(propName="equilibrium card")
-        equilibrium_CEA_output = equilibrium.get_full_cea_output(Pc=self.Pt, pc_units="bar", output="si", short_output=1)
+        equilibrium_CEA_output = equilibrium.get_full_cea_output(Pc=self.Ps, pc_units="bar", output="si", short_output=1)
 
         # Now create a CEA object with SI units to get values expressed with them
         equilibrium = CEA_Obj(propName="equilibrium card", isp_units='sec', cstar_units='m/s',
@@ -318,14 +318,14 @@ class RocketCycleFluid:
                               viscosity_units='millipoise', thermal_cond_units='W/cm-degC')
 
         # Get and reformat mass fractions
-        equilibrium_mass_fractions = equilibrium.get_SpeciesMassFractions(Pc=self.Pt, min_fraction=1e-6)[1]
+        equilibrium_mass_fractions = equilibrium.get_SpeciesMassFractions(Pc=self.Ps, min_fraction=1e-6)[1]
         equilibrium_mass_fractions = reformat_CEA_mass_fractions(equilibrium_mass_fractions)
 
         # Get static temperature
-        equilibrium_temperature = equilibrium.get_Tcomb(Pc=self.Pt)     # K
+        equilibrium_temperature = equilibrium.get_Tcomb(Pc=self.Ps)     # K
 
         # Get equilibrium heat capacity and viscosity
-        transport_properties = equilibrium.get_Chamber_Transport(Pc=self.Pt)[0:2]
+        transport_properties = equilibrium.get_Chamber_Transport(Pc=self.Ps)[0:2]
         Cp_equilibrium = transport_properties[0] * 1e3      # J / (kg * K)
         viscosity = transport_properties[1]                 # milipoise
 
@@ -333,12 +333,7 @@ class RocketCycleFluid:
         equilibrium_fluid = RocketCycleFluid(species=list(equilibrium_mass_fractions.keys()),
                                              mass_fractions=list(equilibrium_mass_fractions.values()),
                                              temperature=equilibrium_temperature, type=self.type, phase=self.phase)
-        # It is assumed equilibrium gas total and static pressure are the same, because the function is intended for
-        # equilibrium of gas in CC manifold, where velocities should be low. As such velocity is also assumed to be zero
-        # there.
-        equilibrium_fluid.Pt = self.Pt  # bar
-        equilibrium_fluid.Ps = self.Pt  # bar
-        equilibrium_fluid.velocity = 0  # m/s
+        equilibrium_fluid.Ps = self.Ps  # bar
         equilibrium_fluid.viscosity = viscosity                 # milipoise
         equilibrium_fluid.mass_Cp_equilibrium = Cp_equilibrium  # J / (kg * K)
 
