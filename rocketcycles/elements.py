@@ -75,7 +75,7 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
      oxidizer and fuel)
     :param float or int preburner_eta: Combustor efficiency (-), which is the ratio of delivered to ideal temperature
     :param float or int OF: Oxidizer-to-Fuel ratio. Only needed if fuel and oxidizer are used.
-    :param float or int preburner_inj_pressure: Preburner pressure at the injector face
+    :param float or int preburner_inj_pressure: Preburner pressure at the injector face (bar)
     :param float or int CR: "Contraction ratio" of the preburner, which is used as a measure of its cross-sectional
      area in order to model Rayleigh line loss.
     :return: Preburner CEA full output, RocketEngineFluid representing its products
@@ -90,7 +90,10 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
         rcea.add_new_oxidizer("oxidizer card", oxidizer.CEA_card)
 
     elif monopropellant is not None:
-        rcea.add_new_propellant("monoprop card", monopropellant.CEA_card)
+        # The monopropellant CEA card name needs to have name instead of oxid or fuel.
+        monoprop_card = monopropellant.CEA_card.replace("oxid", "name")
+        monoprop_card = monoprop_card.replace("fuel", "name")
+        rcea.add_new_propellant("monoprop card", monoprop_card)
 
     # Raise an error if fuel, oxidizer or monopropellant not assigned correctly
     elif fuel is not None and oxidizer is not None and monopropellant is not None:
@@ -121,6 +124,7 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
     # in the combustor. To get full CEA output as a string, CEA object that is not a SI units wrapper needs to be
     # created (as the wrapper does not have such function).  It is also used to get products velocity at the end of
     # preburner.
+    rcea.clearCache(show_size=False)
     if fuel is not None and oxidizer is not None:
         preburner = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
     elif monopropellant is not None:
