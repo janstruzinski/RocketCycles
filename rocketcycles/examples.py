@@ -1,5 +1,7 @@
 import cycles as RC
 import pyfluids
+from fluid import RocketCycleFluid
+
 
 # An example of FFSC LRE using SpaceX Raptor engine - first in analysis mode
 Raptor = RC.FFSC_LRE(OF=3.6, oxidizer=pyfluids.FluidsList.Oxygen, fuel=pyfluids.FluidsList.Methane,
@@ -55,3 +57,39 @@ orsc_engine = RC.ORSC_LRE(OF=3.6, oxidizer=pyfluids.FluidsList.Oxygen, fuel=pyfl
 print(orsc_engine.get_full_output())
 print(orsc_engine.get_residuals())
 
+
+
+# An example of Closed Catalyst LRE using H2O2-RP1 based on Ursa Major Draper engine - first in analysis mode
+# Define oxidizer
+H2O2 = RocketCycleFluid(species=["H2O2(L)", "H2O(L)"], mass_fractions=[0.98, 0.02], temperature=298.95, type="oxid",
+                        phase="liquid")
+H2O2.Pt = 3  # bar
+H2O2.Ps = 3  # bar
+H2O2.density = 1398.86  # kg/m^3
+
+# Define fuel
+JP10 = RocketCycleFluid(species=["JP-10(L)"], mass_fractions=[1], temperature=298.15, type="fuel",
+                        phase="liquid", species_molar_Cp=[236.49])
+JP10.Pt = 3  # bar
+JP10.Ps = 3  # bar
+JP10.density = 931.8  # kg/m^3
+
+Draper = RC.ClosedCatalyst_LRE(OF=6.75, oxidizer=H2O2, fuel=JP10, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
+                               eta_polytropic_OT=0.9, eta_catalyst=0.99, eta_cstar=0.99, eta_isp=0.95,
+                               dP_over_Pinj_CC=0.15, dP_over_Pinj_catalyst=0.05, CR_CC=2.5, CR_catalyst=4, eps_CC=35,
+                               mdot_film_over_mdot_oxid=0.02, cooling_channels_pressure_drop=15,
+                               cooling_channels_temperature_rise=100, axial_velocity_OT=400, mdot_total_0=10,
+                               dP_FP_0=130, dP_OP_0=200, mode="analysis")
+print(Draper.get_full_output())
+
+# Now in sizing mode
+Draper = RC.ClosedCatalyst_LRE(OF=7, oxidizer=H2O2, fuel=JP10, eta_isotropic_OP=0.87, eta_isotropic_FP=0.84,
+                               eta_polytropic_OT=0.9, eta_catalyst=0.99, eta_cstar=0.99, eta_isp=0.95,
+                               dP_over_Pinj_CC=0.15, dP_over_Pinj_catalyst=0.05, CR_CC=2.5, CR_catalyst=4, eps_CC=35,
+                               mdot_film_over_mdot_oxid=0.05, cooling_channels_pressure_drop=15,
+                               cooling_channels_temperature_rise=100, axial_velocity_OT=400, mdot_total_0=4,
+                               dP_FP_0=130, dP_OP_0=200, mode="sizing", ThrustSea=10, P_plenum_CC=150,
+                               lb=[3, 100, 100], ub=[20, 200, 400], jac="3-point", method="dogbox",
+                               loss="soft_l1", tr_solver="exact", xtol=1e-8)
+print(Draper.get_full_output())
+print(Draper.get_residuals())
