@@ -383,17 +383,24 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
                  pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s', enthalpy_units='kJ/kg',
                  density_units='kg/m^3', specific_heat_units='kJ/kg-K', viscosity_units='millipoise',
                  thermal_cond_units='W/cm-degC', fac_CR=CR)
-    (IspVac, Cstar, Tcomb) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)
+    (IspVac_ideal, Cstar, Tcomb) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)
     CC_plenum_pressure = CC_pressure_at_injector / CC.get_Pinj_over_Pcomb(Pc=CC_pressure_at_injector, MR=OF)  # bar
 
     # Get throat and exit area
     A_t = Cstar * mdot_total * eta_cstar / (CC_plenum_pressure * 1e5)  # m^2
     A_e = A_t * eps  # m^2
 
-    # Get vacuum thrust, sea level thrust and Isp
-    IspVac_real = eta_cf * IspVac
-    ThrustVac = IspVac_real * 9.80665 * mdot_total  # N
-    ThrustSea = ThrustVac - 1.01325 * 1e5 * A_e  # N
-    IspSea_real = ThrustSea / (mdot_total * 9.80665)  # s
+    # First get ideal Isp at the sea level
+    IspSea_ideal, sea_level_operation_mode = CC.estimate_Ambient_Isp(Pc=CC_pressure_at_injector, MR=OF, eps=eps,
+                                                                     Pamb=1.01325)
 
-    return CC_CEA_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e
+    # Now calculate real Isp and thrust at the seal level
+    IspSea_real = IspSea_ideal * eta_cf * eta_cstar  # s
+    ThrustSea = mdot_total * 9.80665 * IspSea_real  # N
+
+    # Then calculate thrust and real Isp in vacuum
+    ThrustVac = ThrustSea + 1.01325 * 1e5 * A_e
+    IspVac_real = ThrustVac / (mdot_total * 9.80665)
+
+    return (CC_CEA_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t,
+            A_e, sea_level_operation_mode)

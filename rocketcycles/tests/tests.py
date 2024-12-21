@@ -220,21 +220,24 @@ class TestRocketCycleElements(unittest.TestCase):
                      viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=2.5)
         mdot_fuel = 100
         mdot_oxidizer = 400
-        desired_IspVac, desired_C_star, desired_T_comb = CC.get_IvacCstrTc(Pc=300, MR=4, eps=100)
+        IspVac, C_star, T_comb = CC.get_IvacCstrTc(Pc=300, MR=4, eps=100)
         CC_plenum_pressure = 300e5 / CC.get_Pinj_over_Pcomb(Pc=300, MR=4)  # Pa
-        desired_A_t = (mdot_fuel + mdot_oxidizer) * desired_C_star / CC_plenum_pressure
+        desired_A_t = (400 + 100) * C_star * 0.98 / CC_plenum_pressure
         desired_A_e = 100 * desired_A_t
-        desired_T_vac = desired_IspVac * 9.80665 * (mdot_fuel + mdot_oxidizer)
-        desired_T_sea = desired_T_vac - desired_A_e * 1.01325e5
-        desired_IspSea = desired_T_sea / ((mdot_fuel + mdot_oxidizer) * 9.80665)
+        IspSea, mode = CC.estimate_Ambient_Isp(Pc=300, MR=4, eps=100, Pamb=1.01325)
+        desired_IspSea = IspSea * 0.98 * 0.95
+        desired_T_sea = desired_IspSea * 9.80665 * (400 + 100)
+        desired_T_vac = desired_T_sea + desired_A_e * 1.01325e5
+        desired_IspVac = desired_T_vac / ((400 + 100) * 9.80665)
 
         # Get actual values
-        CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e = \
+        (CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e,
+         sea_level_operation_mode) = \
             cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=400, mdot_fuel=100,
                                                                      oxidizer=oxidizer, fuel=fuel,
                                                                      CC_pressure_at_injector=300, CR=2.5,
-                                                                     eps=100, eta_cstar=1, eta_cf=1)
+                                                                     eps=100, eta_cstar=0.98, eta_cf=0.95)
 
         # Compare the results
-        np.testing.assert_allclose([IspVac, IspSea, ThrustVac, ThrustSea], [desired_IspVac, desired_IspSea,
-                                                                            desired_T_vac / 1e3, desired_T_sea / 1e3])
+        np.testing.assert_allclose([IspVac, IspSea, ThrustVac, ThrustSea],
+                                   [desired_IspVac, desired_IspSea, desired_T_vac / 1e3, desired_T_sea / 1e3])

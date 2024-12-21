@@ -89,6 +89,7 @@ class CycleParameters:
         self.OT_molar_Cp_average = None
         self.FT_gamma_average = None
         self.FT_gamma_average = None
+        self.sea_level_nozzle_operation_mode = None
 
 
 class FFSC_LRE:
@@ -427,7 +428,7 @@ class FFSC_LRE:
         # pressure. Total pressure is used because the gas should slow down in the turbine outlet manifold.
         CP.P_inj_CC = min(CP.FT_equilibrium_gas.Ps, CP.OT_equilibrium_gas.Ps) / (1 + self.dP_over_Pinj_CC)
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = \
+         CP.A_t_CC, CP.A_e_CC, CP.sea_level_nozzle_operation_mode) = \
             cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT,
                                                                      oxidizer=CP.OT_equilibrium_gas,
                                                                      fuel=CP.FT_equilibrium_gas,
@@ -891,7 +892,7 @@ class ORSC_LRE:
             CP.P_inj_CC = min(CP.OT_equilibrium_gas.Ps, CP.heated_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = \
+         CP.A_t_CC, CP.A_e_CC, CP.sea_level_nozzle_operation_mode) = \
             cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=CP.mdot_OT,
                                                                      mdot_fuel=CP.mdot_cooling_channels_outlet,
                                                                      oxidizer=CP.OT_equilibrium_gas,
@@ -1251,7 +1252,7 @@ class ClosedCatalyst_LRE:
             CP.P_inj_CC = min(CP.OT_equilibrium_gas.Ps, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = \
+         CP.A_t_CC, CP.A_e_CC, CP.sea_level_nozzle_operation_mode) = \
             cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_fuel,
                                                                      oxidizer=CP.OT_equilibrium_gas,
                                                                      fuel=CP.pumped_fuel,
