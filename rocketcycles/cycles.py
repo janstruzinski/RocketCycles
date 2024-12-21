@@ -410,9 +410,10 @@ class FFSC_LRE:
         # For determining preburner pressure, use minimum propellant pressure
         CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
         # Get preburner results
-        CP.OPB_CEA_output, CP.OPB_products = cycle_functions.calculate_state_after_preburner(
-            OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
-            preburner_eta=self.eta_OPB, fuel=CP.pumped_fuel, oxidizer=CP.pumped_oxidizer)
+        CP.OPB_CEA_output, CP.OPB_products = \
+            cycle_functions.calculate_state_after_preburner(OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB,
+                                                            CR=self.CR_OPB, preburner_eta=self.eta_OPB,
+                                                            fuel=CP.pumped_fuel, oxidizer=CP.pumped_oxidizer)
 
         # Calculate state after oxygen turbine.
         CP.mdot_OT = CP.mdot_ox_OPB + CP.mdot_crossflow_fuel
@@ -467,8 +468,12 @@ class FFSC_LRE:
         # Return the residuals
         return [residual_thrust, residual_CC_pressure, residual_T_OPB]
 
-    def get_full_output(self):
-        """A function to return the string with data about the cycle."""
+    def get_full_output(self, get_CEA_inputs=False):
+        """A function to return the string with data about the cycle.
+
+        :param boolean get_CEA_inputs: True or False statement whether to print CEA outputs for parts of the cycle
+            where it was used
+        """
         string = \
             (f"\n\n--- INPUT PARAMETERS ---\n"
              f"---Top level parameters---\n"
@@ -554,19 +559,20 @@ class FFSC_LRE:
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"
              f"Vacuum ISP: {self.CP.IspVac_real} s   Sea ISP: {self.CP.IspSea_real} s\n"
              f"Vacuum thrust: {self.CP.ThrustVac} kN    Sea thrust: {self.CP.ThrustSea} kN\n"
-             f"Throat area: {self.CP.A_t_CC} m2    Nozzle exit area:  {self.CP.A_e_CC} m2\n\n"
-             f"---CEA OUTPUTS---\n\n"
-             f"---FPB CEA output---\n"
-             f"{self.CP.FPB_CEA_output}\n\n"
-             f"---FT equilibrium gas CEA output---\n"
-             f"{self.CP.FT_equilibrium_gas_CEA_output}\n\n"
-             f"---OPB CEA output---\n"
-             f"{self.CP.OPB_CEA_output}\n\n"
-             f"---OT equilibrium gas CEA output---\n"
-             f"{self.CP.OT_equilibrium_gas_CEA_output}\n\n"
-             f"---CC CEA Output---\n"
-             f"{self.CP.CC_CEA_output}"
-             )
+             f"Throat area: {self.CP.A_t_CC} m2    Nozzle exit area:  {self.CP.A_e_CC} m2\n\n")
+        if get_CEA_inputs:
+            string += (
+                f"---CEA OUTPUTS---\n\n"
+                f"---FPB CEA output---\n"
+                f"{self.CP.FPB_CEA_output}\n\n"
+                f"---FT equilibrium gas CEA output---\n"
+                f"{self.CP.FT_equilibrium_gas_CEA_output}\n\n"
+                f"---OPB CEA output---\n"
+                f"{self.CP.OPB_CEA_output}\n\n"
+                f"---OT equilibrium gas CEA output---\n"
+                f"{self.CP.OT_equilibrium_gas_CEA_output}\n\n"
+                f"---CC CEA Output---\n"
+                f"{self.CP.CC_CEA_output}")
         return string
 
     def get_residuals(self):
@@ -931,8 +937,12 @@ class ORSC_LRE:
         # Return the residuals
         return [residual_thrust, residual_CC_pressure, residual_dP_propellants]
 
-    def get_full_output(self):
-        """A function to return the string with data about the cycle."""
+    def get_full_output(self, get_CEA_inputs=False):
+        """A function to return the string with data about the cycle.
+
+        :param boolean get_CEA_inputs: True or False statement whether to print CEA outputs for parts of the cycle
+            where it was used
+        """
         string = \
             (f"\n\n--- INPUT PARAMETERS ---\n"
              f"---Top level parameters---\n"
@@ -1003,15 +1013,16 @@ class ORSC_LRE:
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"
              f"Vacuum ISP: {self.CP.IspVac_real} s   Sea ISP: {self.CP.IspSea_real} s\n"
              f"Vacuum thrust: {self.CP.ThrustVac} kN    Sea thrust: {self.CP.ThrustSea} kN\n"
-             f"Throat area: {self.CP.A_t_CC} m2    Nozzle exit area:  {self.CP.A_e_CC} m2\n\n"
+             f"Throat area: {self.CP.A_t_CC} m2    Nozzle exit area:  {self.CP.A_e_CC} m2\n\n")
+        if get_CEA_inputs:
+            string += (
              f"---CEA OUTPUTS---\n\n"
              f"---OPB CEA output---\n"
              f"{self.CP.OPB_CEA_output}\n\n"
              f"---OT equilibrium gas CEA output---\n"
              f"{self.CP.OT_equilibrium_gas_CEA_output}\n\n"
              f"---CC CEA Output---\n"
-             f"{self.CP.CC_CEA_output}"
-             )
+             f"{self.CP.CC_CEA_output}")
         return string
 
     def get_residuals(self):
@@ -1290,8 +1301,12 @@ class ClosedCatalyst_LRE:
         # Return the residuals
         return [residual_thrust, residual_CC_pressure, residual_dP_propellants]
 
-    def get_full_output(self):
-        """A function to return the string with data about the cycle."""
+    def get_full_output(self, get_CEA_inputs=False):
+        """A function to return the string with data about the cycle.
+
+        :param boolean get_CEA_inputs: True or False statement whether to print CEA outputs for parts of the cycle
+            where it was used
+        """
         string = \
             (f"\n\n--- INPUT PARAMETERS ---\n"
              f"---Top level parameters---\n"
@@ -1357,15 +1372,16 @@ class ClosedCatalyst_LRE:
              f"Combustion temperature: {self.CP.CC_Tcomb} K\n"
              f"Vacuum ISP: {self.CP.IspVac_real} s   Sea ISP: {self.CP.IspSea_real} s\n"
              f"Vacuum thrust: {self.CP.ThrustVac} kN    Sea thrust: {self.CP.ThrustSea} kN\n"
-             f"Throat area: {self.CP.A_t_CC} m2    Nozzle exit area:  {self.CP.A_e_CC} m2\n\n"
+             f"Throat area: {self.CP.A_t_CC} m2    Nozzle exit area:  {self.CP.A_e_CC} m2\n\n")
+        if get_CEA_inputs:
+            string += (
              f"---CEA OUTPUTS---\n\n"
              f"---Catalyst CEA output---\n"
              f"{self.CP.catalyst_CEA_output}\n\n"
              f"---OT equilibrium gas CEA output---\n"
              f"{self.CP.OT_equilibrium_gas_CEA_output}\n\n"
              f"---CC CEA Output---\n"
-             f"{self.CP.CC_CEA_output}"
-             )
+             f"{self.CP.CC_CEA_output}")
         return string
 
     def get_residuals(self):
