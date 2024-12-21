@@ -350,7 +350,7 @@ def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, press
 
 
 def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer, fuel, CC_pressure_at_injector, CR,
-                                             eps, eta_cstar, eta_isp):
+                                             eps, eta_cstar, eta_cf):
     """A function to calculate the combustion chamber performance.
 
     :param float or int mdot_oxidizer: Oxidizer massflow (kg/s)
@@ -391,7 +391,7 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     A_e = A_t * eps  # m^2
 
     # Get vacuum thrust, sea level thrust and Isp
-    IspVac_real = eta_isp * IspVac
+    IspVac_real = eta_cf * IspVac
     ThrustVac = IspVac_real * 9.80665 * mdot_total  # N
     ThrustSea = ThrustVac - 1.01325 * 1e5 * A_e  # N
     IspSea_real = ThrustSea / (mdot_total * 9.80665)  # s

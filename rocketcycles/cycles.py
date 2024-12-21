@@ -94,7 +94,7 @@ class CycleParameters:
 class FFSC_LRE:
     def __init__(self, OF, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
                  P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
-                 eta_polytropic_FT, eta_FPB, eta_OPB, eta_cstar, eta_isp, Ps_Pt_OT, Ps_Pt_FT, dP_over_Pinj_CC,
+                 eta_polytropic_FT, eta_FPB, eta_OPB, eta_cstar, eta_cf, Ps_Pt_OT, Ps_Pt_FT, dP_over_Pinj_CC,
                  dP_over_Pinj_OPB, dP_over_Pinj_FPB, CR_FPB, CR_OPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel,
                  cooling_channels_pressure_drop, cooling_channels_temperature_rise, axial_velocity_OT,
                  axial_velocity_FT, mdot_total_0, mdot_crossflow_f_over_mdot_f_0,
@@ -126,7 +126,7 @@ class FFSC_LRE:
         :param float or int eta_OPB: Efficiency of the oxidizer preburner (-) defined as ratio of actual to ideal
          temperature
         :param float or int eta_cstar: C* efficiency of the CC (-)
-        :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float or int eta_cf: Cf efficiency of the CC (-)
         :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
          recovered in diffuser and manifold after turbine (-)
         :param float Ps_Pt_FT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
@@ -211,7 +211,7 @@ class FFSC_LRE:
         self.eta_FPB = eta_FPB
         self.eta_OPB = eta_OPB
         self.eta_cstar = eta_cstar
-        self.eta_isp = eta_isp
+        self.eta_cf = eta_cf
         self.Ps_Pt_OT = Ps_Pt_OT
         self.Ps_Pt_FT = Ps_Pt_FT
 
@@ -426,7 +426,7 @@ class FFSC_LRE:
          CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
             mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT, oxidizer=CP.OT_equilibrium_gas,
             fuel=CP.FT_equilibrium_gas, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-            eta_cstar=self.eta_cstar, eta_isp=self.eta_isp))
+            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf))
 
         # Return CycleParameters object storing data about cycle
         return CP
@@ -480,7 +480,7 @@ class FFSC_LRE:
              f" - FPB efficiency: {self.eta_FPB}     "
              f" - OPB efficiency: {self.eta_OPB}\n"
              f" - C* efficiency: {self.eta_cstar}   "
-             f" - Isp efficiency: {self.eta_isp}\n"
+             f" - Cf efficiency: {self.eta_cf}\n"
              f" - OT pressure recovery factor: {self.Ps_Pt_OT}"
              f" - FT pressure recovery factor: {self.Ps_Pt_FT}\n"
              f"---Pressure drop ratios---\n"
@@ -587,7 +587,7 @@ class FFSC_LRE:
 class ORSC_LRE:
     def __init__(self, OF, oxidizer, fuel, fuel_CEA_name, oxidizer_CEA_name, T_oxidizer, T_fuel,
                  P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_isotropic_BFP, eta_polytropic_OT,
-                 eta_OPB, eta_cstar, eta_isp, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_OPB, CR_OPB, CR_CC, eps_CC,
+                 eta_OPB, eta_cstar, eta_cf, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_OPB, CR_OPB, CR_CC, eps_CC,
                  mdot_film_over_mdot_fuel, cooling_channels_pressure_drop, cooling_channels_temperature_rise,
                  axial_velocity_OT, mdot_total_0, dP_FP_0, dP_OP_0, mode, mdot_crossflow_f_over_mdot_f_0=None,
                  ThrustSea=None, P_plenum_CC=None, T_OPB=None, lb=None, ub=None, jac=None, method=None, loss=None,
@@ -615,7 +615,7 @@ class ORSC_LRE:
         :param float or int eta_OPB: Efficiency of the oxidizer preburner (-) defined as ratio of actual to ideal
          temperature
         :param float or int eta_cstar: C* efficiency of the CC (-)
-        :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float or int eta_cf: Cf efficiency of the CC (-)
         :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
          recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_OPB: Pressure drop ratio for the oxidizer preburner (-)
@@ -689,7 +689,7 @@ class ORSC_LRE:
         self.eta_polytropic_OT = eta_polytropic_OT
         self.eta_OPB = eta_OPB
         self.eta_cstar = eta_cstar
-        self.eta_isp = eta_isp
+        self.eta_cf = eta_cf
         self.Ps_Pt_OT = Ps_Pt_OT
 
         # Assign pressure drops
@@ -879,7 +879,7 @@ class ORSC_LRE:
          CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
             mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_cooling_channels_outlet, oxidizer=CP.OT_equilibrium_gas,
             fuel=CP.heated_fuel, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-            eta_cstar=self.eta_cstar, eta_isp=self.eta_isp))
+            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf))
 
         # Return CycleParameters object storing data about cycle
         return CP
@@ -930,7 +930,7 @@ class ORSC_LRE:
              f" - OT polytropic efficiency: {self.eta_polytropic_OT}\n"
              f" - OPB efficiency: {self.eta_OPB}    "
              f" - C* efficiency: {self.eta_cstar}   "
-             f" - Isp efficiency: {self.eta_isp}\n"
+             f" - Cf efficiency: {self.eta_cf}\n"
              f" - OT pressure recovery factor: {self.Ps_Pt_OT}\n"
              f"---Pressure drop ratios---\n"
              f"Over CC injector: {self.dP_over_Pinj_CC}     Over OPB injector:{self.dP_over_Pinj_OPB}\n"
@@ -1018,7 +1018,7 @@ class ORSC_LRE:
 
 class ClosedCatalyst_LRE:
     def __init__(self, OF, oxidizer, fuel, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT,
-                 eta_catalyst, eta_cstar, eta_isp, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_catalyst, CR_catalyst,
+                 eta_catalyst, eta_cstar, eta_cf, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_catalyst, CR_catalyst,
                  CR_CC, eps_CC, mdot_film_over_mdot_oxid, cooling_channels_pressure_drop,
                  cooling_channels_temperature_rise, axial_velocity_OT, mdot_total_0, dP_FP_0, dP_OP_0, mode,
                  ThrustSea=None, P_plenum_CC=None, lb=None, ub=None, jac=None, method=None, loss=None,
@@ -1039,7 +1039,7 @@ class ClosedCatalyst_LRE:
         :param float or int eta_catalyst: Efficiency of the catalyst (-) defined as ratio of actual to ideal
          temperature (as not all of H2O2 will be decomposed)
         :param float or int eta_cstar: C* efficiency of the CC (-)
-        :param float or int eta_isp: Isp efficiency of the CC (-)
+        :param float or int eta_cf: Cf efficiency of the CC (-)
         :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
          recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_catalyst: Total pressure drop ratio for the catalyst, across the injector and
@@ -1095,7 +1095,7 @@ class ClosedCatalyst_LRE:
         self.eta_polytropic_OT = eta_polytropic_OT
         self.eta_catalyst = eta_catalyst
         self.eta_cstar = eta_cstar
-        self.eta_isp = eta_isp
+        self.eta_cf = eta_cf
         self.Ps_Pt_OT = Ps_Pt_OT
 
         # Assign pressure drops
@@ -1228,7 +1228,7 @@ class ClosedCatalyst_LRE:
          CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
             mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_fuel, oxidizer=CP.OT_equilibrium_gas,
             fuel=CP.pumped_fuel, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-            eta_cstar=self.eta_cstar, eta_isp=self.eta_isp))
+            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf))
 
         # Return CycleParameters object storing data about cycle
         return CP
@@ -1274,11 +1274,11 @@ class ClosedCatalyst_LRE:
              f"{self.oxidizer.CEA_card}     Pressure: {self.oxidizer.Pt}\n"
              f"---Efficiencies---\n"
              f" - OP isotropic efficiency: {self.eta_isotropic_OP}   "
-             f" - FP isotropic efficiency: {self.eta_isotropic_FP}\n"
+             f" - FP isotropic efficiency: {self.eta_isotropic_FP}\n" 
              f" - OT polytropic efficiency: {self.eta_polytropic_OT}\n"
              f" - Catalyst efficiency: {self.eta_catalyst}    "
              f" - C* efficiency: {self.eta_cstar}   "
-             f" - Isp efficiency: {self.eta_isp}\n"
+             f" - Cf efficiency: {self.eta_cf}\n"
              f" - OT pressure recovery factor: {self.Ps_Pt_OT}\n"
              f"---Pressure drop ratios---\n"
              f"Over CC injector: {self.dP_over_Pinj_CC}     "
