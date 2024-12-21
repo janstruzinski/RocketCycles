@@ -1,4 +1,4 @@
-from rocketcycles import elements
+from rocketcycles import cycle_functions
 from rocketcycles.fluid import RocketCycleFluid, reformat_CEA_mass_fractions
 import rocketcea.cea_obj as rcea
 from rocketcea.cea_obj_w_units import CEA_Obj
@@ -123,7 +123,7 @@ class TestRocketCycleElements(unittest.TestCase):
         fluid.Pt = 3  # bar
         fluid.Ps = fluid.Pt  # bar
         fluid.mass_Cp_frozen = 1000  # J / (kg * K)
-        pumped_fluid, enthalpy_change = elements.calculate_state_after_pump(
+        pumped_fluid, enthalpy_change = cycle_functions.calculate_state_after_pump(
             fluid=fluid, delta_P=60, efficiency=0.5)
 
         # Calculate desired values
@@ -155,8 +155,9 @@ class TestRocketCycleElements(unittest.TestCase):
                                phase="liquid", species_molar_Cp=[50.180])
         Propane = RocketCycleFluid(species=["C3H8(L)"], mass_fractions=[1], temperature=231.08, type="fuel",
                                    phase="liquid", species_molar_Cp=[92.974])
-        preburner_CEA_output, preburner_products = elements.calculate_state_after_preburner(
-            fuel=Propane, oxidizer=LOX, OF=50, preburner_inj_pressure=600, CR=1.5, preburner_eta=1)
+        preburner_CEA_output, preburner_products = \
+            cycle_functions.calculate_state_after_preburner(fuel=Propane, oxidizer=LOX, OF=50,
+                                                            preburner_inj_pressure=600, CR=1.5, preburner_eta=1)
 
         # Compare the results
         np.testing.assert_allclose([preburner_products.Ts, preburner_products.mass_Cp_frozen],
@@ -172,11 +173,11 @@ class TestRocketCycleElements(unittest.TestCase):
         inlet_gas.calculate_total_temperature()
         inlet_gas.Ps = 600  # bar
         inlet_gas.calculate_total_from_static_pressure()
-        beta_tt, outlet_gas, equilibrium_gas, equilibrium_output, average_molar_Cp, gamma_average = (
-            elements.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
-                                                   turbine_polytropic_efficiency=0.85,
-                                                   preburner_products=inlet_gas,
-                                                   turbine_axial_velocity=223.293, pressure_recovery_factor=1.0))
+        beta_tt, outlet_gas, equilibrium_gas, equilibrium_output, average_molar_Cp, gamma_average = \
+            cycle_functions.calculate_state_after_turbine(massflow=149, turbine_power=37e6,
+                                                          turbine_polytropic_efficiency=0.85,
+                                                          preburner_products=inlet_gas,
+                                                          turbine_axial_velocity=223.293, pressure_recovery_factor=1.0)
         actual_w_specific = outlet_gas.h0 - inlet_gas.h0  # kJ / mol
 
         # Calculate manually the desired enthalpy difference
@@ -194,9 +195,10 @@ class TestRocketCycleElements(unittest.TestCase):
         coolant.Pt = 800  # bar
 
         # Get fluid after cooling channels
-        coolant, mdot = elements.calculate_state_after_cooling_channels(
-            fluid=coolant, mdot_coolant=149, mdot_film=20, pressure_drop=150,
-            temperature_rise=100)
+        coolant, mdot = \
+            cycle_functions.calculate_state_after_cooling_channels(fluid=coolant, mdot_coolant=149, mdot_film=20,
+                                                                   pressure_drop=150,
+                                                                   temperature_rise=100)
 
         # Compare the results
         np.testing.assert_allclose([mdot, coolant.Ps, coolant.Ts], [129, 650, 191])
@@ -227,10 +229,11 @@ class TestRocketCycleElements(unittest.TestCase):
         desired_IspSea = desired_T_sea / ((mdot_fuel + mdot_oxidizer) * 9.80665)
 
         # Get actual values
-        CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e = (
-            elements.calculate_combustion_chamber_performance(
-                mdot_oxidizer=400, mdot_fuel=100, oxidizer=oxidizer, fuel=fuel, CC_pressure_at_injector=300, CR=2.5,
-                eps=100, eta_cstar=1, eta_isp=1))
+        CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e = \
+            cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=400, mdot_fuel=100,
+                                                                     oxidizer=oxidizer, fuel=fuel,
+                                                                     CC_pressure_at_injector=300, CR=2.5,
+                                                                     eps=100, eta_cstar=1, eta_cf=1)
 
         # Compare the results
         np.testing.assert_allclose([IspVac, IspSea, ThrustVac, ThrustSea], [desired_IspVac, desired_IspSea,

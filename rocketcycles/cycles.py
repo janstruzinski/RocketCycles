@@ -1,4 +1,4 @@
-from rocketcycles import elements
+from rocketcycles import cycle_functions
 from rocketcycles.fluid import pyfluid_to_rocket_cycle_fluid, RocketCycleFluid
 import pyfluids
 import scipy.optimize as opt
@@ -321,7 +321,7 @@ class FFSC_LRE:
             pyfluids.Input.pressure(self.P_oxidizer * 1e5), pyfluids.Input.temperature(self.T_oxidizer - 273.15))
 
         # Go over fuel side of the system. First calculate states after fuel pump and power required to drive it.
-        CP.pumped_fuel, CP.w_pumped_fuel = elements.calculate_state_after_pump_for_pyfluids(
+        CP.pumped_fuel, CP.w_pumped_fuel = cycle_functions.calculate_state_after_pump_for_pyfluids(
             fluid=CP.fuel, delta_P=dP_FP, efficiency=self.eta_isotropic_FP)
         CP.Power_FP = CP.w_pumped_fuel * CP.mdot_fuel
 
@@ -329,7 +329,7 @@ class FFSC_LRE:
         # fuel into RocketCycleFluid object. Pumped fuel will be still used later on for oxygen preburner,
         # hence it is changed to RocketCycleFluid.
         CP.heated_fuel, CP.mdot_cooling_channels_outlet = (
-            elements.calculate_state_after_cooling_channels_for_Pyfluids(
+            cycle_functions.calculate_state_after_cooling_channels_for_Pyfluids(
                 fluid=CP.pumped_fuel, mdot_coolant=CP.mdot_fuel, mdot_film=CP.mdot_film,
                 pressure_drop=self.cooling_channels_pressure_drop,
                 temperature_rise=self.cooling_channels_temperature_rise))
@@ -352,7 +352,7 @@ class FFSC_LRE:
         # both modes.
         CP.dP_OP = dP_OP
         # Get state after oxidizer pump and power required to drive it
-        CP.pumped_oxidizer, CP.w_pumped_oxidizer = elements.calculate_state_after_pump_for_pyfluids(
+        CP.pumped_oxidizer, CP.w_pumped_oxidizer = cycle_functions.calculate_state_after_pump_for_pyfluids(
             fluid=CP.oxidizer, delta_P=CP.dP_OP, efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
         # Change oxidizer into RocketCycleFluid object.
@@ -372,9 +372,10 @@ class FFSC_LRE:
                 # Get its OF ratio.
                 OF_FPB = mdot_ox / CP.mdot_f_FPB
                 # Get results for FPB.
-                FPB_CEA_output, FPB_products = elements.calculate_state_after_preburner(
-                    OF=OF_FPB, preburner_inj_pressure=CP.P_inj_FPB, CR=self.CR_FPB,
-                    preburner_eta=self.eta_FPB, fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
+                FPB_CEA_output, FPB_products = \
+                    cycle_functions.calculate_state_after_preburner(OF=OF_FPB, preburner_inj_pressure=CP.P_inj_FPB,
+                                                                    CR=self.CR_FPB, preburner_eta=self.eta_FPB,
+                                                                    fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
                 # Return residual. Total temperature is used, since this is what will be next to the walls due to gas
                 # slowing down due to boundary layer.
                 return FPB_products.Tt - self.T_FPB
@@ -386,18 +387,20 @@ class FFSC_LRE:
         # Now get FPB OF ratio.
         CP.OF_FPB = CP.mdot_crossflow_oxidizer / CP.mdot_f_FPB
         # And get results for FPB.
-        CP.FPB_CEA_output, CP.FPB_products = elements.calculate_state_after_preburner(
-            OF=CP.OF_FPB, preburner_inj_pressure=CP.P_inj_FPB, CR=self.CR_FPB,
-            preburner_eta=self.eta_FPB, fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
+        CP.FPB_CEA_output, CP.FPB_products = \
+            cycle_functions.calculate_state_after_preburner(OF=CP.OF_FPB, preburner_inj_pressure=CP.P_inj_FPB,
+                                                            CR=self.CR_FPB, preburner_eta=self.eta_FPB,
+                                                            fuel=CP.heated_fuel, oxidizer=CP.pumped_oxidizer)
 
         # Calculate state after fuel turbine
         CP.mdot_FT = CP.mdot_f_FPB + CP.mdot_crossflow_oxidizer
         (CP.FT_beta_tt, CP.FT_outlet_gas, CP.FT_equilibrium_gas, CP.FT_equilibrium_gas_CEA_output,
-         CP.FT_molar_Cp_average, CP.FT_gamma_average) = (
-            elements.calculate_state_after_turbine(
-                massflow=CP.mdot_FT, turbine_power=CP.Power_FP, turbine_polytropic_efficiency=self.eta_polytropic_FT,
-                preburner_products=CP.FPB_products, turbine_axial_velocity=self.axial_velocity_FT,
-                pressure_recovery_factor=self.Ps_Pt_FT))
+         CP.FT_molar_Cp_average, CP.FT_gamma_average) = \
+            cycle_functions.calculate_state_after_turbine(massflow=CP.mdot_FT, turbine_power=CP.Power_FP,
+                                                          turbine_polytropic_efficiency=self.eta_polytropic_FT,
+                                                          preburner_products=CP.FPB_products,
+                                                          turbine_axial_velocity=self.axial_velocity_FT,
+                                                          pressure_recovery_factor=self.Ps_Pt_FT)
 
         # Now go over oxidizer side of the system. Calculate state after oxygen preburner. Again first calculate
         # oxidizer massflow through it and preburner OF.
@@ -406,27 +409,31 @@ class FFSC_LRE:
         # For determining preburner pressure, use minimum propellant pressure
         CP.P_inj_OPB = min(CP.pumped_oxidizer.Pt, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_OPB)
         # Get preburner results
-        CP.OPB_CEA_output, CP.OPB_products = elements.calculate_state_after_preburner(
+        CP.OPB_CEA_output, CP.OPB_products = cycle_functions.calculate_state_after_preburner(
             OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
             preburner_eta=self.eta_OPB, fuel=CP.pumped_fuel, oxidizer=CP.pumped_oxidizer)
 
         # Calculate state after oxygen turbine.
         CP.mdot_OT = CP.mdot_ox_OPB + CP.mdot_crossflow_fuel
         (CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output,
-         CP.OT_molar_Cp_average, CP.OT_gamma_average) = (
-            elements.calculate_state_after_turbine(
-                massflow=CP.mdot_OT, turbine_power=CP.Power_OP, turbine_polytropic_efficiency=self.eta_polytropic_OT,
-                preburner_products=CP.OPB_products, turbine_axial_velocity=self.axial_velocity_OT,
-                pressure_recovery_factor=self.Ps_Pt_OT))
+         CP.OT_molar_Cp_average, CP.OT_gamma_average) = \
+            cycle_functions.calculate_state_after_turbine(massflow=CP.mdot_OT, turbine_power=CP.Power_OP,
+                                                          turbine_polytropic_efficiency=self.eta_polytropic_OT,
+                                                          preburner_products=CP.OPB_products,
+                                                          turbine_axial_velocity=self.axial_velocity_OT,
+                                                          pressure_recovery_factor=self.Ps_Pt_OT)
 
         # Calculate combustion chamber performance. CC pressure at injector is determined wrt to minimum propellant
         # pressure. Total pressure is used because the gas should slow down in the turbine outlet manifold.
         CP.P_inj_CC = min(CP.FT_equilibrium_gas.Ps, CP.OT_equilibrium_gas.Ps) / (1 + self.dP_over_Pinj_CC)
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
-            mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT, oxidizer=CP.OT_equilibrium_gas,
-            fuel=CP.FT_equilibrium_gas, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf))
+         CP.A_t_CC, CP.A_e_CC) = \
+            cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_FT,
+                                                                     oxidizer=CP.OT_equilibrium_gas,
+                                                                     fuel=CP.FT_equilibrium_gas,
+                                                                     CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC,
+                                                                     eps=self.eps_CC, eta_cstar=self.eta_cstar,
+                                                                     eta_cf=self.eta_cf)
 
         # Return CycleParameters object storing data about cycle
         return CP
@@ -441,9 +448,8 @@ class FFSC_LRE:
         [mdot_total, mdot_crossflow_fuel_over_mdot_fuel, dP_FP] = x * self.x_ref
 
         # Analyze the cycle
-        CP = (self.analyze_cycle(mdot_total=mdot_total,
-                                 mdot_crossflow_fuel_over_mdot_fuel=mdot_crossflow_fuel_over_mdot_fuel,
-                                 dP_FP=dP_FP))
+        CP = self.analyze_cycle(mdot_total=mdot_total,
+                                mdot_crossflow_fuel_over_mdot_fuel=mdot_crossflow_fuel_over_mdot_fuel, dP_FP=dP_FP)
 
         # Get residuals. These will allow to find input parameters that allow to get feasible cycle.
         # All residuals are normalized wrt some reference scales.
@@ -789,7 +795,7 @@ class ORSC_LRE:
             pyfluids.Input.pressure(self.P_oxidizer * 1e5), pyfluids.Input.temperature(self.T_oxidizer - 273.15))
 
         # First go over the oxidizer side of the system. Get state after oxidizer pump and power required to drive it
-        CP.pumped_oxidizer, CP.w_pumped_oxidizer = elements.calculate_state_after_pump_for_pyfluids(
+        CP.pumped_oxidizer, CP.w_pumped_oxidizer = cycle_functions.calculate_state_after_pump_for_pyfluids(
             fluid=CP.oxidizer, delta_P=dP_OP, efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
         # Change oxidizer into RocketCycleFluid object.
@@ -803,14 +809,16 @@ class ORSC_LRE:
         # Before we calculate state after oxidizer preburner, we need to get our pumped amd boosted fuel. The pressure
         # rise across the main fuel pump is given, so the pressure rise in the boosted pump needs to be calculated.
         # First calculate states after the main fuel pump and power required to drive it.
-        CP.pumped_fuel, CP.w_pumped_fuel = elements.calculate_state_after_pump_for_pyfluids(
-            fluid=CP.fuel, delta_P=dP_FP, efficiency=self.eta_isotropic_FP)
+        CP.pumped_fuel, CP.w_pumped_fuel = \
+            cycle_functions.calculate_state_after_pump_for_pyfluids(fluid=CP.fuel, delta_P=dP_FP,
+                                                                    efficiency=self.eta_isotropic_FP)
         CP.Power_FP = CP.w_pumped_fuel * CP.mdot_fuel
         # Now calculate the booster pump pressure rise
         CP.dP_BFP = CP.pumped_oxidizer.Pt - (CP.pumped_fuel.pressure / 1e5)  # bar
         # Now get the state after booster pump
-        CP.boosted_fuel, CP.w_boosted_fuel = elements.calculate_state_after_pump_for_pyfluids(
-            fluid=CP.pumped_fuel, delta_P=CP.dP_BFP, efficiency=self.eta_isotropic_BFP)
+        CP.boosted_fuel, CP.w_boosted_fuel = \
+            cycle_functions.calculate_state_after_pump_for_pyfluids(fluid=CP.pumped_fuel, delta_P=CP.dP_BFP,
+                                                                    efficiency=self.eta_isotropic_BFP)
         # Change boosted fuel into RocketCycleFluid object
         CP.boosted_fuel = pyfluid_to_rocket_cycle_fluid(fluid=CP.boosted_fuel, CEA_name=self.fuel_CEA_name,
                                                         type="fuel", phase="liquid")
@@ -825,9 +833,10 @@ class ORSC_LRE:
                 # Get its OF ratio.
                 OF_OPB = CP.mdot_oxidizer / mdot_f
                 # Get results for FPB.
-                OPB_CEA_output, OPB_products = elements.calculate_state_after_preburner(
-                    OF=OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
-                    preburner_eta=self.eta_OPB, fuel=CP.boosted_fuel, oxidizer=CP.pumped_oxidizer)
+                OPB_CEA_output, OPB_products = \
+                    cycle_functions.calculate_state_after_preburner(OF=OF_OPB, preburner_inj_pressure=CP.P_inj_OPB,
+                                                                    CR=self.CR_OPB, preburner_eta=self.eta_OPB,
+                                                                    fuel=CP.boosted_fuel, oxidizer=CP.pumped_oxidizer)
                 # Return residual. Total temperature is used, since this is what will be next to the walls due to gas
                 # slowing down due to boundary layer.
                 return OPB_products.Tt - self.T_OPB
@@ -839,9 +848,10 @@ class ORSC_LRE:
         # Now get OPB OF ratio.
         CP.OF_OPB = CP.mdot_oxidizer / CP.mdot_crossflow_fuel
         # And get results for FPB.
-        CP.OPB_CEA_output, CP.OPB_products = elements.calculate_state_after_preburner(
-            OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB, CR=self.CR_OPB,
-            preburner_eta=self.eta_OPB, fuel=CP.boosted_fuel, oxidizer=CP.pumped_oxidizer)
+        CP.OPB_CEA_output, CP.OPB_products = \
+            cycle_functions.calculate_state_after_preburner(OF=CP.OF_OPB, preburner_inj_pressure=CP.P_inj_OPB,
+                                                            CR=self.CR_OPB, preburner_eta=self.eta_OPB,
+                                                            fuel=CP.boosted_fuel, oxidizer=CP.pumped_oxidizer)
         # Also get the power required to drive the booster pump
         CP.Power_BFP = CP.w_boosted_fuel * CP.mdot_crossflow_fuel
 
@@ -849,19 +859,24 @@ class ORSC_LRE:
         CP.mdot_OT = CP.mdot_oxidizer + CP.mdot_crossflow_fuel
         CP.OT_shaft_power = CP.Power_BFP + CP.Power_FP + CP.Power_OP
         (CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output,
-         CP.OT_molar_Cp_average, CP.OT_gamma_average) = (
-            elements.calculate_state_after_turbine(
-                massflow=CP.mdot_OT, turbine_power=CP.OT_shaft_power,
-                turbine_polytropic_efficiency=self.eta_polytropic_OT, preburner_products=CP.OPB_products,
-                turbine_axial_velocity=self.axial_velocity_OT, pressure_recovery_factor=self.Ps_Pt_OT))
+         CP.OT_molar_Cp_average, CP.OT_gamma_average) = \
+            cycle_functions.calculate_state_after_turbine(massflow=CP.mdot_OT, turbine_power=CP.OT_shaft_power,
+                                                          turbine_polytropic_efficiency=self.eta_polytropic_OT,
+                                                          preburner_products=CP.OPB_products,
+                                                          turbine_axial_velocity=self.axial_velocity_OT,
+                                                          pressure_recovery_factor=self.Ps_Pt_OT)
 
         # Calculate state after cooling channels and change heated fuel into RocketCycleFluid object.
         CP.mdot_cooling_channels_inlet = CP.mdot_fuel - CP.mdot_crossflow_fuel
-        CP.heated_fuel, CP.mdot_cooling_channels_outlet = (
-            elements.calculate_state_after_cooling_channels_for_Pyfluids(
-                fluid=CP.pumped_fuel, mdot_coolant=CP.mdot_cooling_channels_inlet, mdot_film=CP.mdot_film,
-                pressure_drop=self.cooling_channels_pressure_drop,
-                temperature_rise=self.cooling_channels_temperature_rise))
+        CP.heated_fuel, CP.mdot_cooling_channels_outlet = \
+            cycle_functions.calculate_state_after_cooling_channels_for_Pyfluids(fluid=CP.pumped_fuel,
+                                                                                mdot_coolant=
+                                                                                CP.mdot_cooling_channels_inlet,
+                                                                                mdot_film=CP.mdot_film,
+                                                                                pressure_drop=
+                                                                                self.cooling_channels_pressure_drop,
+                                                                                temperature_rise=
+                                                                                self.cooling_channels_temperature_rise)
         CP.heated_fuel = pyfluid_to_rocket_cycle_fluid(fluid=CP.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
                                                        phase="liquid")
 
@@ -876,10 +891,14 @@ class ORSC_LRE:
             CP.P_inj_CC = min(CP.OT_equilibrium_gas.Ps, CP.heated_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
-            mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_cooling_channels_outlet, oxidizer=CP.OT_equilibrium_gas,
-            fuel=CP.heated_fuel, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf))
+         CP.A_t_CC, CP.A_e_CC) = \
+            cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=CP.mdot_OT,
+                                                                     mdot_fuel=CP.mdot_cooling_channels_outlet,
+                                                                     oxidizer=CP.OT_equilibrium_gas,
+                                                                     fuel=CP.heated_fuel,
+                                                                     CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC,
+                                                                     eps=self.eps_CC,
+                                                                     eta_cstar=self.eta_cstar, eta_cf=self.eta_cf)
 
         # Return CycleParameters object storing data about cycle
         return CP
@@ -1075,7 +1094,7 @@ class ClosedCatalyst_LRE:
 
         # First do user warnings if wrong combinations of arguments are called
         if (mode == "sizing" and any([ThrustSea, P_plenum_CC, lb, ub, jac, method, loss, tr_solver]) is
-              None):
+                None):
             warnings.simplefilter("error", UserWarning)
             warnings.warn("Arguments missing for sizing mode")
 
@@ -1178,16 +1197,20 @@ class ClosedCatalyst_LRE:
         CP.mdot_film = CP.mdot_oxidizer * self.mdot_film_over_mdot_oxid
 
         # First go over the oxidizer side of the system. Get state after oxidizer pump and power required to drive it
-        CP.pumped_oxidizer, CP.w_pumped_oxidizer = elements.calculate_state_after_pump(
-            fluid=self.oxidizer, delta_P=dP_OP, efficiency=self.eta_isotropic_OP)
+        CP.pumped_oxidizer, CP.w_pumped_oxidizer = \
+            cycle_functions.calculate_state_after_pump(fluid=self.oxidizer, delta_P=dP_OP,
+                                                       efficiency=self.eta_isotropic_OP)
         CP.Power_OP = CP.w_pumped_oxidizer * CP.mdot_oxidizer
 
         # Calculate state after cooling channels.
-        CP.heated_oxidizer, CP.mdot_cooling_channels_outlet = (
-            elements.calculate_state_after_cooling_channels(
-                fluid=CP.pumped_oxidizer, mdot_coolant=CP.mdot_oxidizer, mdot_film=CP.mdot_film,
-                pressure_drop=self.cooling_channels_pressure_drop,
-                temperature_rise=self.cooling_channels_temperature_rise))
+        CP.heated_oxidizer, CP.mdot_cooling_channels_outlet = \
+            cycle_functions.calculate_state_after_cooling_channels(fluid=CP.pumped_oxidizer,
+                                                                   mdot_coolant=CP.mdot_oxidizer,
+                                                                   mdot_film=CP.mdot_film,
+                                                                   pressure_drop=
+                                                                   self.cooling_channels_pressure_drop,
+                                                                   temperature_rise=
+                                                                   self.cooling_channels_temperature_rise)
 
         # Now perform calculations related to catalyst bed. First calculate its (outlet) pressure based on oxidizer
         # injection pressure.
@@ -1195,12 +1218,14 @@ class ClosedCatalyst_LRE:
 
         # And get results for catalyst. Here OPB related parameters in CP are used as placeholder for catalyst
         # parameters.
-        CP.catalyst_CEA_output, CP.catalyst_products = elements.calculate_state_after_preburner(
-            preburner_inj_pressure=CP.P_inj_catalyst, CR=self.CR_catalyst,
-            preburner_eta=self.eta_catalyst, monopropellant=CP.heated_oxidizer)
+        CP.catalyst_CEA_output, CP.catalyst_products = \
+            cycle_functions.calculate_state_after_preburner(preburner_inj_pressure=CP.P_inj_catalyst,
+                                                            CR=self.CR_catalyst,
+                                                            preburner_eta=self.eta_catalyst,
+                                                            monopropellant=CP.heated_oxidizer)
 
         # Now calculate state after fuel pump and power required to drive it.
-        CP.pumped_fuel, CP.w_pumped_fuel = elements.calculate_state_after_pump(
+        CP.pumped_fuel, CP.w_pumped_fuel = cycle_functions.calculate_state_after_pump(
             fluid=self.fuel, delta_P=dP_FP, efficiency=self.eta_isotropic_FP)
         CP.Power_FP = CP.w_pumped_fuel * CP.mdot_fuel
 
@@ -1208,11 +1233,12 @@ class ClosedCatalyst_LRE:
         CP.OT_shaft_power = CP.Power_FP + CP.Power_OP
         CP.mdot_OT = CP.mdot_cooling_channels_outlet
         (CP.OT_beta_tt, CP.OT_outlet_gas, CP.OT_equilibrium_gas, CP.OT_equilibrium_gas_CEA_output,
-         CP.OT_molar_Cp_average, CP.OT_gamma_average) = (
-            elements.calculate_state_after_turbine(
-                massflow=CP.mdot_OT, turbine_power=CP.OT_shaft_power,
-                turbine_polytropic_efficiency=self.eta_polytropic_OT, preburner_products=CP.catalyst_products,
-                turbine_axial_velocity=self.axial_velocity_OT, pressure_recovery_factor=self.Ps_Pt_OT))
+         CP.OT_molar_Cp_average, CP.OT_gamma_average) = \
+            cycle_functions.calculate_state_after_turbine(massflow=CP.mdot_OT, turbine_power=CP.OT_shaft_power,
+                                                          turbine_polytropic_efficiency=self.eta_polytropic_OT,
+                                                          preburner_products=CP.catalyst_products,
+                                                          turbine_axial_velocity=self.axial_velocity_OT,
+                                                          pressure_recovery_factor=self.Ps_Pt_OT)
 
         # Calculate combustion chamber performance. For sizing mode, it does not matter wrt which propellant CC pressure
         # at injector is established, as it will be imposed by the residuals that their total pressure is the same.
@@ -1225,10 +1251,13 @@ class ClosedCatalyst_LRE:
             CP.P_inj_CC = min(CP.OT_equilibrium_gas.Ps, CP.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
         (CP.CC_CEA_output, CP.P_plenum_CC, CP.IspVac_real, CP.IspSea_real, CP.CC_Tcomb, CP.ThrustVac, CP.ThrustSea,
-         CP.A_t_CC, CP.A_e_CC) = (elements.calculate_combustion_chamber_performance(
-            mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_fuel, oxidizer=CP.OT_equilibrium_gas,
-            fuel=CP.pumped_fuel, CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf))
+         CP.A_t_CC, CP.A_e_CC) = \
+            cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=CP.mdot_OT, mdot_fuel=CP.mdot_fuel,
+                                                                     oxidizer=CP.OT_equilibrium_gas,
+                                                                     fuel=CP.pumped_fuel,
+                                                                     CC_pressure_at_injector=CP.P_inj_CC, CR=self.CR_CC,
+                                                                     eps=self.eps_CC,
+                                                                     eta_cstar=self.eta_cstar, eta_cf=self.eta_cf)
 
         # Return CycleParameters object storing data about cycle
         return CP
@@ -1274,7 +1303,7 @@ class ClosedCatalyst_LRE:
              f"{self.oxidizer.CEA_card}     Pressure: {self.oxidizer.Pt}\n"
              f"---Efficiencies---\n"
              f" - OP isotropic efficiency: {self.eta_isotropic_OP}   "
-             f" - FP isotropic efficiency: {self.eta_isotropic_FP}\n" 
+             f" - FP isotropic efficiency: {self.eta_isotropic_FP}\n"
              f" - OT polytropic efficiency: {self.eta_polytropic_OT}\n"
              f" - Catalyst efficiency: {self.eta_catalyst}    "
              f" - C* efficiency: {self.eta_cstar}   "
