@@ -1,18 +1,20 @@
 Hi,
 
 Welcome to RocketCycles. It is a python library dedicated to staged combustion rocket engine cycles. It
-allows to both analyse and size them in order to get combustion chamber performance, pressure ratio of the turbines or
-pressure rise in the pumps, crossflow massflows etc.
+allows to both analyse them for given arguments and size them for given constraints in order to get combustion chamber
+performance, pressure ratio of the turbines or pressure rise in the pumps, crossflow massflows etc.
 
-elements.py stores functions representing pumps, turbines, preburners, combustion chambers. They can be
+cycle_functions.py stores functions representing pumps, turbines, preburners, combustion chambers. They can be
 assembled together into a staged combustion rocket engine cycle.
 
 fluid.py stores RocketCycleFluid class that conveniently allows to store data about propellants or
 preburner products, as well as to get their thermophysical properties using NASA 9 polynomials or real gas density
 using PyFluids (wrapper about CoolProp).
 
-cycles.py stores definitions of classes representing different staged combustion rocket engine cycles.
-These can be used as inspiration if you want to assemble your own closed cycle.
+cycle_classes.py stores definitions of classes representing different staged combustion rocket engine cycles. Cycle
+class is a parent class with shared attributes and methods. FFSC_LRE, ORSC_LRE, CC_LRE are subclasses containing
+analysis functions specific to these cycles. These can be used as inspiration if you want to assemble your own closed
+cycle. CycleSizing allows to size any of the cycles above for given arguments.
 
 examples.py shows how to call these classes and perform the analysis.
 
