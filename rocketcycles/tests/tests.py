@@ -157,7 +157,7 @@ class TestRocketCycleElements(unittest.TestCase):
                                    phase="liquid", species_molar_Cp=[92.974])
         preburner_CEA_output, preburner_products = \
             cycle_functions.calculate_state_after_preburner(fuel=Propane, oxidizer=LOX, OF=50,
-                                                            preburner_inj_pressure=600, CR=1.5, preburner_eta=1)
+                                                            preburner_inj_pressure=600, CR=1.5)
 
         # Compare the results
         np.testing.assert_allclose([preburner_products.Ts, preburner_products.mass_Cp_frozen],

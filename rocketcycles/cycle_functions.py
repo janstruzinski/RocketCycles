@@ -64,8 +64,7 @@ def calculate_state_after_pump(fluid, delta_P, efficiency):
     return fluid, w_total
 
 
-def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
-                                    fuel=None, oxidizer=None, monopropellant=None, OF=None):
+def calculate_state_after_preburner(preburner_inj_pressure, CR, fuel=None, oxidizer=None, monopropellant=None, OF=None):
     """A function to calculate the state of the combustion product mixture in the preburner based on inflow
     propellants.
 
@@ -73,7 +72,6 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
     :param RocketCycleFluid oxidizer: RocketCycleFluid object representing oxidizer
     :param RocketCycleFluid monopropellant: RocketCycleFluid object representing monopropellant (if used instead of
      oxidizer and fuel)
-    :param float or int preburner_eta: Combustor efficiency (-), which is the ratio of delivered to ideal temperature
     :param float or int OF: Oxidizer-to-Fuel ratio. Only needed if fuel and oxidizer are used.
     :param float or int preburner_inj_pressure: Preburner pressure at the injector face (bar)
     :param float or int CR: "Contraction ratio" of the preburner, which is used as a measure of its cross-sectional
@@ -152,8 +150,7 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, preburner_eta,
     # Get temperature in the preburner and gamma of the products. It is assumed that preburner efficiency only affects
     # temperature but not gas composition, as the difference between the two temperatures is very small, so composition
     # and other properties should be similar.
-    preburner_temperature_ideal = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
-    preburner_temperature = preburner_temperature_ideal * preburner_eta
+    preburner_temperature = preburner.get_Tcomb(Pc=preburner_inj_pressure, MR=OF)  # K
 
     # Get preburner pressure at its end
     preburner_plenum_pressure = (preburner_inj_pressure /
@@ -360,6 +357,8 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     :param float or int CC_pressure_at_injector: CC pressure (in bar) at the injector plate
     :param float or int CR: CC contraction ratio
     :param float or int eps: CC expansion ratio
+    :param float or int eta_cstar: C* efficiency (-)
+    :param float or int eta_cf: Cf efficiency at sea level (-)
 
     :return: Full CEA output, CC plenum pressure, real vacuum and sea level specific impulse,
      ideal combustion temperature, real vacuum and sea level thrust, throat and exit areas
