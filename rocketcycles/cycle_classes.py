@@ -79,6 +79,7 @@ class Cycle:
         self.catalyst_CEA_output = None
         self.OT_equilibrium_gas_CEA_output = None
         self.CC_CEA_output = None
+        self.CC_with_film_CEA_output = None
 
         # Pressures
         self.P_inj_FPB = None
@@ -339,7 +340,11 @@ class Cycle:
                     f"{self.OT_equilibrium_gas_CEA_output}\n\n")
             string += (
                 f"---CC CEA Output---\n"
-                f"{self.CC_CEA_output}")
+                f"{self.CC_CEA_output}\n\n")
+            if self.CC_with_film_CEA_output is not None:
+                string += (
+                    f"---CC with film coolant CEA Output---\n"
+                    f"{self.CC_with_film_CEA_output}\n\n")
         return string
 
 
@@ -568,15 +573,14 @@ class FFSC_LRE(Cycle):
         # Calculate combustion chamber performance. CC pressure at injector is determined wrt to minimum propellant
         # pressure. Total pressure is used because the gas should slow down in the turbine outlet manifold.
         self.P_inj_CC = min(self.FT_equilibrium_gas.Ps, self.OT_equilibrium_gas.Ps) / (1 + self.dP_over_Pinj_CC)
-        (self.CC_CEA_output, self.P_plenum_CC, self.IspVac_real, self.IspSea_real, self.CC_Tcomb, self.ThrustVac,
-         self.ThrustSea, self.A_t_CC, self.A_e_CC, self.sea_level_nozzle_operation_mode) = \
-            cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_FT,
-                                                                     oxidizer=self.OT_equilibrium_gas,
-                                                                     fuel=self.FT_equilibrium_gas,
-                                                                     CC_pressure_at_injector=self.P_inj_CC,
-                                                                     CR=self.CR_CC,
-                                                                     eps=self.eps_CC, eta_cstar=self.eta_cstar,
-                                                                     eta_cf=self.eta_cf)
+        (self.CC_CEA_output, self.CC_with_film_CEA_output, self.P_plenum_CC, self.IspVac_real, self.IspSea_real,
+         self.CC_Tcomb, self.ThrustVac, self.ThrustSea, self.A_t_CC, self.A_e_CC,
+         self.sea_level_nozzle_operation_mode) = \
+            cycle_functions.calculate_combustion_chamber_performance(
+                mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_FT, oxidizer=self.OT_equilibrium_gas,
+                fuel=self.FT_equilibrium_gas, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
+                eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
+                coolant_CEA_card=self.pumped_fuel.CEA_card)
 
 
 class ORSC_LRE(Cycle):
@@ -788,16 +792,13 @@ class ORSC_LRE(Cycle):
         # smaller than the injected propellant pressure)
         self.P_inj_CC = min(self.OT_equilibrium_gas.Ps, self.heated_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
-        (self.CC_CEA_output, self.P_plenum_CC, self.IspVac_real, self.IspSea_real, self.CC_Tcomb, self.ThrustVac,
-         self.ThrustSea, self.A_t_CC, self.A_e_CC, self.sea_level_nozzle_operation_mode) = \
-            cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=self.mdot_OT,
-                                                                     mdot_fuel=self.mdot_cooling_channels_outlet,
-                                                                     oxidizer=self.OT_equilibrium_gas,
-                                                                     fuel=self.heated_fuel,
-                                                                     CC_pressure_at_injector=self.P_inj_CC,
-                                                                     CR=self.CR_CC,
-                                                                     eps=self.eps_CC,
-                                                                     eta_cstar=self.eta_cstar, eta_cf=self.eta_cf)
+        (self.CC_CEA_output, self.CC_with_film_CEA_output, self.P_plenum_CC, self.IspVac_real, self.IspSea_real,
+         self.CC_Tcomb, self.ThrustVac, self.ThrustSea, self.A_t_CC, self.A_e_CC,
+         self.sea_level_nozzle_operation_mode) = cycle_functions.calculate_combustion_chamber_performance(
+            mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_cooling_channels_outlet, oxidizer=self.OT_equilibrium_gas,
+            fuel=self.heated_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
+            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
+            coolant_CEA_card=self.pumped_fuel.CEA_card)
 
 
 class ClosedCatalyst_LRE(Cycle):
@@ -908,12 +909,13 @@ class ClosedCatalyst_LRE(Cycle):
         # smaller than the injected propellant pressure)
         self.P_inj_CC = min(self.OT_equilibrium_gas.Ps, self.pumped_fuel.Pt) / (1 + self.dP_over_Pinj_CC)
         # Now get CC results.
-        (self.CC_CEA_output, self.P_plenum_CC, self.IspVac_real, self.IspSea_real, self.CC_Tcomb, self.ThrustVac,
-         self.ThrustSea, self.A_t_CC, self.A_e_CC, self.sea_level_nozzle_operation_mode) = \
-            cycle_functions.calculate_combustion_chamber_performance(
-                mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_fuel, oxidizer=self.OT_equilibrium_gas,
-                fuel=self.pumped_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
-                eta_cstar=self.eta_cstar, eta_cf=self.eta_cf)
+        (self.CC_CEA_output, self.CC_with_film_CEA_output, self.P_plenum_CC, self.IspVac_real, self.IspSea_real,
+         self.CC_Tcomb, self.ThrustVac, self.ThrustSea, self.A_t_CC, self.A_e_CC,
+         self.sea_level_nozzle_operation_mode) = cycle_functions.calculate_combustion_chamber_performance(
+            mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_fuel, oxidizer=self.OT_equilibrium_gas,
+            fuel=self.pumped_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
+            eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
+            coolant_CEA_card=self.pumped_oxidizer.CEA_card)
 
 
 class CycleSizing:
@@ -1079,7 +1081,6 @@ class CycleSizing:
                 (self.cycle.pumped_fuel.Pt - self.cycle.OT_equilibrium_gas.Ps) / self.cycle.P_plenum_CC_required
             # Return the residuals for ORSC/CC
             return [residual_thrust, residual_CC_pressure, residual_dP_propellants]
-
 
     def get_residuals(self):
         """A function to return string about initial and final residuals."""

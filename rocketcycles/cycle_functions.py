@@ -3,6 +3,7 @@ import rocketcea.cea_obj as rcea
 import scipy.optimize as opt
 from rocketcycles.fluid import RocketCycleFluid, reformat_CEA_mass_fractions
 import warnings
+import re
 
 
 def calculate_state_after_pump_for_pyfluids(fluid, delta_P, efficiency):
@@ -347,7 +348,7 @@ def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, press
 
 
 def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer, fuel, CC_pressure_at_injector, CR,
-                                             eps, eta_cstar, eta_cf):
+                                             eps, eta_cstar, eta_cf, mdot_film=0, coolant_CEA_card=None):
     """A function to calculate the combustion chamber performance.
 
     :param float or int mdot_oxidizer: Oxidizer massflow (kg/s)
@@ -359,30 +360,84 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     :param float or int eps: CC expansion ratio
     :param float or int eta_cstar: C* efficiency (-)
     :param float or int eta_cf: Cf efficiency at sea level (-)
+    :param float or int mdot_film: Film coolant massflow (kg/s)
+    :param str coolant_CEA_card: Film coolant CEA card
 
     :return: Full CEA output, CC plenum pressure, real vacuum and sea level specific impulse,
      ideal combustion temperature, real vacuum and sea level thrust, throat and exit areas
     """
 
-    # Get total massflow and OF
-    mdot_total = mdot_oxidizer + mdot_fuel  # kg / s
-    OF = mdot_oxidizer / mdot_fuel
+    # Get total massflow and OF of the core flow (without film coolant)
+    mdot_total = mdot_oxidizer + mdot_fuel + mdot_film  # kg / s
 
-    # Retrieve cards and add them to CEA
-    rcea.add_new_fuel(name="fuel card", card_str=fuel.CEA_card)
-    rcea.add_new_oxidizer(name="oxidizer card", card_str=oxidizer.CEA_card)
+    # In the analysis below, it is assumed film coolant eventually mixes with the combustion gases, and so is
+    # lumped together with reactants. However, it may be desirable to have the properties of the core flow
+    # (without film coolant) calculated and saved as well. Therefore, first analysis without film coolant is run.
+    # Create CEA object with Imperial units to be able to get full output.
+    rcea.add_new_fuel(name="fuel card w/o coolant", card_str=fuel.CEA_card)
+    rcea.add_new_oxidizer(name="oxidizer card w/o coolant", card_str=oxidizer.CEA_card)
+    CC = rcea.CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", fac_CR=CR)
+    CC_core_CEA_output = CC.get_full_cea_output(Pc=CC_pressure_at_injector, MR=mdot_oxidizer / mdot_fuel, eps=eps,
+                                                pc_units="bar", output="si", short_output=1)
+    # Also get temperature of combustion. Input is given in Psia and output is in Rankine degrees, hence conversions
+    Tcomb = CC.get_Tcomb(Pc=CC_pressure_at_injector * 14.5038, MR=mdot_oxidizer / mdot_fuel) * 5 / 9
 
-    # Create CEA object with Imperial units to be able to get full output
-    CC = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
-    CC_CEA_output = CC.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF, eps=eps, pc_units="bar", output="si",
-                                           short_output=1)
+    # If there is no film coolant, there will be no CEA results for mixed case.
+    if mdot_film == 0 and coolant_CEA_card is None:
+        CC_with_film_CEA_output = None
+        # Prepare CEA object for further calculations and get OF
+        CC = CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", isp_units='sec',
+                     cstar_units='m/s', pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                     enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                     viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
+        OF = mdot_oxidizer / mdot_fuel
 
-    # Create CEA object with SI units for other variables
-    CC = CEA_Obj(oxName="oxidizer card", fuelName="fuel card", isp_units='sec', cstar_units='m/s',
-                 pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s', enthalpy_units='kJ/kg',
-                 density_units='kg/m^3', specific_heat_units='kJ/kg-K', viscosity_units='millipoise',
-                 thermal_cond_units='W/cm-degC', fac_CR=CR)
-    (IspVac_ideal, Cstar, Tcomb) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)
+    # If there is film coolant, do analysis for it
+    elif mdot_film != 0 and coolant_CEA_card is not None:
+        # Recognize whether fuel or oxygen is used for coolant and depending on the results, calculate total OF and add
+        # cards to CEA.
+        if "fuel" in coolant_CEA_card:
+            # Calculate OF
+            OF = mdot_oxidizer / (mdot_fuel + mdot_film)
+            # Adjust weight fractions in CEA cards
+            mdot_total_fuel = mdot_fuel + mdot_film
+            fuel_CEA_card = modify_wt_percent(CEA_card=fuel.CEA_card,
+                                              adjust_func=lambda wt: wt * mdot_fuel / mdot_total_fuel)
+            coolant_CEA_card = modify_wt_percent(CEA_card=coolant_CEA_card,
+                                                 adjust_func=lambda wt: wt * mdot_film / mdot_total_fuel)
+            # Merge film and fuel cards
+            fuel_CEA_card = fuel_CEA_card + coolant_CEA_card
+            # Add cards to CEA
+            rcea.add_new_fuel(name="fuel card", card_str=fuel_CEA_card)
+            rcea.add_new_oxidizer(name="oxidizer card", card_str=oxidizer.CEA_card)
+        elif "oxid" in coolant_CEA_card:
+            # Calculate OF
+            OF = (mdot_oxidizer + mdot_film) / mdot_fuel
+            # Adjust weight fractions in CEA cards
+            mdot_total_ox = mdot_oxidizer + mdot_film
+            ox_CEA_card = modify_wt_percent(CEA_card=oxidizer.CEA_card,
+                                            adjust_func=lambda wt: wt * mdot_oxidizer / mdot_total_ox)
+            coolant_CEA_card = modify_wt_percent(CEA_card=coolant_CEA_card,
+                                                 adjust_func=lambda wt: wt * mdot_film / mdot_total_ox)
+            # Merge film and fuel cards
+            ox_CEA_card = ox_CEA_card + coolant_CEA_card
+            # Add cards to CEA
+            rcea.add_new_fuel(name="fuel card", card_str=fuel.CEA_card)
+            rcea.add_new_oxidizer(name="oxidizer card", card_str=ox_CEA_card)
+
+        # Create CEA object with Imperial units to be able to get and save full output.
+        CC_with_film = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
+        CC_with_film_CEA_output = CC_with_film.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF, eps=eps,
+                                                                   pc_units="bar", output="si", short_output=1)
+
+        # Create CEA object with SI units for further calculations
+        CC = CEA_Obj(oxName="oxidizer card", fuelName="fuel card", isp_units='sec', cstar_units='m/s',
+                     pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                     enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                     viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
+
+    # Get ideal specific impulse, C* and CC plenum pressure
+    (IspVac_ideal, Cstar) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)[0:2]
     CC_plenum_pressure = CC_pressure_at_injector / CC.get_Pinj_over_Pcomb(Pc=CC_pressure_at_injector, MR=OF)  # bar
 
     # Get throat and exit area
@@ -401,5 +456,28 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     ThrustVac = ThrustSea + 1.01325 * 1e5 * A_e
     IspVac_real = ThrustVac / (mdot_total * 9.80665)
 
-    return (CC_CEA_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb, ThrustVac / 1e3, ThrustSea / 1e3, A_t,
-            A_e, sea_level_operation_mode)
+    return (CC_core_CEA_output, CC_with_film_CEA_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb,
+            ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e, sea_level_operation_mode)
+
+
+def modify_wt_percent(CEA_card, adjust_func):
+    """A function to change weight fractions in CEA card based on given transformation function.
+
+    :param string CEA_card: CEA card in which weight fractions need to be modified.
+    :param callable function adjust_func: A transformation function to adjust weight fractions.
+
+    :return: The modified CEA card string with updated weight fractions.
+    """
+
+    def replace_wt(match):
+        prefix = match.group(1)  # 'wt%='
+        current_value = float(match.group(2))  # Extract the number as float
+        # Adjust the value using the provided function
+        new_value = adjust_func(current_value)
+        # Format the new value and return it
+        return f"{prefix}{new_value}"
+
+    # Regular expression to find wt% values
+    pattern = r'(wt%=\s*)(\d+(\.\d+)?)'
+    # Replace all occurrences using the replace_wt function
+    return re.sub(pattern, replace_wt, CEA_card)

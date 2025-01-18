@@ -231,7 +231,7 @@ class TestRocketCycleElements(unittest.TestCase):
         desired_IspVac = desired_T_vac / ((400 + 100) * 9.80665)
 
         # Get actual values
-        (CC_output, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e,
+        (CC_output, dummy, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e,
          sea_level_operation_mode) = \
             cycle_functions.calculate_combustion_chamber_performance(mdot_oxidizer=400, mdot_fuel=100,
                                                                      oxidizer=oxidizer, fuel=fuel,
