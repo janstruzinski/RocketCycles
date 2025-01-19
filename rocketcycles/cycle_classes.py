@@ -473,6 +473,9 @@ class FFSC_LRE(Cycle):
                 fluid=self.pumped_fuel, mdot_coolant=self.mdot_fuel, mdot_film=self.mdot_film,
                 pressure_drop=self.dP_cooling_channels,
                 temperature_rise=self.dT_cooling_channels))
+        # Phase below is given as "liquid", so that total and static pressure are assumed to be about equal after the
+        # cooling channels, but it will also work when there are two-phases with large vapor content or the fluid is
+        # supercritical due to pressure recovery in the manifold afterward
         self.heated_fuel = \
             pyfluid_to_rocket_cycle_fluid(fluid=self.heated_fuel, CEA_name=self.fuel_CEA_name, type="fuel",
                                           phase="liquid")
@@ -785,6 +788,9 @@ class ORSC_LRE(Cycle):
         # Now both pumped and heated fuel can be changed to RocketCycleFluid
         self.pumped_fuel = pyfluid_to_rocket_cycle_fluid(fluid=self.pumped_fuel, CEA_name=self.fuel_CEA_name,
                                                          type="fuel", phase="liquid")
+        # Phase below is given as "liquid", so that total and static pressure are assumed to be about equal after the
+        # cooling channels, but it will also work when there are two-phases with large vapor content or the fluid is
+        # supercritical due to pressure recovery in the manifold afterward
         self.heated_fuel = pyfluid_to_rocket_cycle_fluid(fluid=self.heated_fuel, CEA_name=self.fuel_CEA_name,
                                                          type="fuel", phase="liquid")
 
