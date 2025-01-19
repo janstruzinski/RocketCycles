@@ -928,8 +928,9 @@ class CycleSizing:
     def __init__(self, cycle, P_CC_plenum_required, mdot_total_0, dP_FP_0, lb, ub, T_OPB_required=None,
                  T_FPB_required=None, mdot_crossflow_fuel_over_mdot_fuel_0=None, ThrustVac_required=None,
                  ThrustSea_required=None, dP_OP_0=None, inner_loop_bracket=(0.04, 0.11), inner_loop_xtol=1e-3,
-                 inner_loop_maxiter=1000, jac="2-point", method="dogbox", loss="soft_l1", tr_solver="exact", xtol=1e-8,
-                 ftol=None, fscale=1, diff_step=None):
+                 inner_loop_maxiter=1000, jac="3-point", method="dogbox", loss="soft_l1", tr_solver="exact",
+                 tr_options=None, xtol=1e-3, ftol=1e-3, gtol=None, fscale=0.5, max_nfev=None, diff_step=1e-3,
+                 verbose=2):
         """ A class to size the cycle to achieve given thrust, CC pressure, preburner temperatures (if present).
 
         :param FFSC_LRE or ORCS_LRE or CC_LRE cycle: Cycle subclass representing cycle which is to be sized.
@@ -943,8 +944,8 @@ class CycleSizing:
         :param float or int mdot_total_0: Initial solution estimate for total propellant massflow (kg/s)
         :param float or int mdot_crossflow_fuel_over_mdot_fuel_0: Initial solution estimate for fuel crossflow massflow
             to fuel massflow ratio (if oxidizer preburner is present)
-        :param float or int dP_FP_0: Initial solution estiamte for fuel pump pressure rise (bar)
-        :param float or int dP_OP_0: Initial solution estiamte for oxidizer pump pressure rise (bar)
+        :param float or int dP_FP_0: Initial solution estimate for fuel pump pressure rise (bar)
+        :param float or int dP_OP_0: Initial solution estimate for oxidizer pump pressure rise (bar)
         :param tuple inner_loop_bracket: A tuple of floats representing oxidizer crossflow to oxidizer massflow/
             fuel crossflow to fuel massflow for inner loop, which calculates oxidizer/fuel
             crossflow based on required fuel/oxidizer preburner temperatures
@@ -960,10 +961,14 @@ class CycleSizing:
         :param string method: method argument for scipy.optimize.least_squares
         :param string loss: loss argument for scipy.optimize.least_squares
         :param string tr_solver: tr_solver argument for scipy.optimize.least_squares
+        :param dict tr_options: tr_options argument for scipy.optimize.least_squares
         :param float or int xtol: xtol argument for scipy.optimize.least_squares
         :param float or int ftol: ftol argument for scipy.optimize.least_squares
+        :param float or int gtol: gtol argument for scipy.optimize.least_squares
         :param float or int fscale: fscale argument for scipy.optimize.least_squares
         :param float or int diff_step: diff_step argument for scipy.optimize.least_squares
+        :param int max_nfev: max_nfev argument for scipy.optimize.least_squares
+        :param int verbose: verbose argument for scipy.optimize.least_squares
         """
 
         # First raise warnings if incorrect arguments are given
@@ -1027,8 +1032,8 @@ class CycleSizing:
         # Solution is normalized, so it needs to be scaled again.
         self.result = opt.least_squares(fun=self.calculate_normalized_residuals, x0=self.x0, jac=jac,
                                         bounds=self.norm_bounds, method=method, loss=loss, tr_solver=tr_solver,
-                                        xtol=xtol, ftol=ftol, f_scale=fscale, verbose=2, diff_step=diff_step,
-                                        x_scale="jac")
+                                        tr_options=tr_options, xtol=xtol, ftol=ftol, gtol=gtol, f_scale=fscale,
+                                        verbose=verbose, diff_step=diff_step, max_nfev=max_nfev)
         self.x = self.result.x * self.x_ref
 
         # Get residuals for the solution, both normalized and non-normalized.
