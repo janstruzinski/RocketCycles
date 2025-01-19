@@ -1,3 +1,5 @@
+import time
+
 from rocketcea.cea_obj_w_units import CEA_Obj
 import rocketcea.cea_obj as rcea
 import scipy.optimize as opt
@@ -18,8 +20,13 @@ def calculate_state_after_pump_for_pyfluids(fluid, delta_P, efficiency):
 
     # For PyFluid, a built-in function can be used.
     old_enthalpy = fluid.enthalpy  # J / kg
-    fluid = fluid.compression_to_pressure(
-        pressure=fluid.pressure + delta_P * 1e5, isentropic_efficiency=efficiency * 100)
+    try:
+        fluid = fluid.compression_to_pressure(pressure=fluid.pressure + delta_P * 1e5,
+                                              isentropic_efficiency=efficiency * 100)
+    except:
+        warnings.simplefilter("error", UserWarning)
+        warnings.warn("Slurry is created in the pump. Please increase propellant inlet temperature or decrease pressure"
+                      " rise in the pump")
     w_total = fluid.enthalpy - old_enthalpy  # J / kg
     return fluid, w_total
 
