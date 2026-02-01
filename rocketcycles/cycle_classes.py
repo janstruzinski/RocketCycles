@@ -15,7 +15,7 @@ class Cycle:
                  dP_over_Pinj_FPB=None, CR_FPB=None, CR_OPB=None, CR_catalyst=None, CR_CC=None, eps_CC=None,
                  mdot_film_over_mdot_oxid=None, mdot_film_over_mdot_fuel=None, dP_cooling_channels=None,
                  dP_over_Pinj_catalyst=None, dT_cooling_channels=None, axial_velocity_OT=None,
-                 axial_velocity_FT=None):
+                 axial_velocity_FT=None, include_film_in_cstar=False):
         """A parent class to store shared attributes and methods for all Cycle-derives classes"""
 
         # Propellants
@@ -150,6 +150,7 @@ class Cycle:
         self.CR_OPB = CR_OPB
         self.CR_CC = CR_CC
         self.eps_CC = eps_CC
+        self.include_film_in_cstar = include_film_in_cstar
 
     def get_full_output(self, get_CEA_inputs=False):
         """A function to return the string with data about the cycle.
@@ -353,7 +354,7 @@ class FFSC_LRE(Cycle):
                  P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_polytropic_OT, eta_polytropic_FT,
                  eta_cstar, eta_cf, Ps_Pt_OT, Ps_Pt_FT, dP_over_Pinj_CC, dP_over_Pinj_OPB, dP_over_Pinj_FPB, CR_FPB,
                  CR_OPB, CR_CC, eps_CC, mdot_film_over_mdot_fuel, dP_cooling_channels,
-                 dT_cooling_channels, axial_velocity_OT, axial_velocity_FT):
+                 dT_cooling_channels, axial_velocity_OT, axial_velocity_FT, include_film_in_cstar):
         """A class to analyse and size full flow staged combustion cycle.
 
         :param float or int OF: Oxidizer-to-Fuel ratio of the cycle
@@ -370,7 +371,7 @@ class FFSC_LRE(Cycle):
         :param float or int eta_polytropic_OT: Polytropic efficiency of the oxidizer turbine (-)
         :param float or int eta_polytropic_FT: Polytropic efficiency of the fuel turbine (-)
         :param float or int eta_cstar: C* efficiency of the CC (-)
-        :param float or int eta_cf: Cf efficiency of the CC (-) at the sea level
+        :param float or int eta_cf: Cf efficiency of the CC (-) in vacuum
         :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
          recovered in diffuser and manifold after turbine (-)
         :param float Ps_Pt_FT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
@@ -399,10 +400,9 @@ class FFSC_LRE(Cycle):
                          eta_polytropic_FT=eta_polytropic_FT, eta_cstar=eta_cstar, eta_cf=eta_cf, Ps_Pt_OT=Ps_Pt_OT,
                          Ps_Pt_FT=Ps_Pt_FT, dP_over_Pinj_CC=dP_over_Pinj_CC, dP_over_Pinj_OPB=dP_over_Pinj_OPB,
                          dP_over_Pinj_FPB=dP_over_Pinj_FPB, CR_FPB=CR_FPB, CR_OPB=CR_OPB, CR_CC=CR_CC, eps_CC=eps_CC,
-                         mdot_film_over_mdot_fuel=mdot_film_over_mdot_fuel,
-                         dP_cooling_channels=dP_cooling_channels,
-                         dT_cooling_channels=dT_cooling_channels,
-                         axial_velocity_OT=axial_velocity_OT, axial_velocity_FT=axial_velocity_FT)
+                         mdot_film_over_mdot_fuel=mdot_film_over_mdot_fuel, dP_cooling_channels=dP_cooling_channels,
+                         dT_cooling_channels=dT_cooling_channels, axial_velocity_OT=axial_velocity_OT,
+                         axial_velocity_FT=axial_velocity_FT, include_film_in_cstar=include_film_in_cstar)
 
     def analyze_cycle(self, mdot_total, mdot_crossflow_fuel_over_mdot_fuel, dP_FP, mdot_crossflow_ox_over_mdot_ox=None,
                       dP_OP=None, T_FPB_required=None, mdot_crossflow_ox_over_mdot_ox_bracket=(0.04, 0.11),
@@ -583,7 +583,7 @@ class FFSC_LRE(Cycle):
                 mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_FT, oxidizer=self.OT_equilibrium_gas,
                 fuel=self.FT_equilibrium_gas, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
                 eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
-                coolant_CEA_card=self.pumped_fuel.CEA_card)
+                coolant_CEA_card=self.pumped_fuel.CEA_card, include_film_in_cstar=self.include_film_in_cstar)
 
 
 class ORSC_LRE(Cycle):
@@ -591,7 +591,7 @@ class ORSC_LRE(Cycle):
                  P_oxidizer, P_fuel, eta_isotropic_OP, eta_isotropic_FP, eta_isotropic_BFP, eta_polytropic_OT,
                  eta_cstar, eta_cf, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_OPB, CR_OPB, CR_CC, eps_CC,
                  mdot_film_over_mdot_fuel, dP_cooling_channels, dT_cooling_channels,
-                 axial_velocity_OT):
+                 axial_velocity_OT, include_film_in_cstar):
         """A class to analyse and size oxygen rich staged combustion cycle.
 
         :param float or int OF: Oxidizer-to-Fuel ratio of the cycle
@@ -608,7 +608,7 @@ class ORSC_LRE(Cycle):
         :param float or int eta_isotropic_BFP: Isotropic efficiency of the booster fuel pump (-)
         :param float or int eta_polytropic_OT: Polytropic efficiency of the oxidizer turbine (-)
         :param float or int eta_cstar: C* efficiency of the CC (-)
-        :param float or int eta_cf: Cf efficiency of the CC (-) at the sea level
+        :param float or int eta_cf: Cf efficiency of the CC (-) in vacuum
         :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
          recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_OPB: Pressure drop ratio for the oxidizer preburner (-)
@@ -629,11 +629,10 @@ class ORSC_LRE(Cycle):
                          T_fuel=T_fuel, P_oxidizer=P_oxidizer, P_fuel=P_fuel, eta_isotropic_OP=eta_isotropic_OP,
                          eta_isotropic_BFP=eta_isotropic_BFP, eta_isotropic_FP=eta_isotropic_FP,
                          eta_polytropic_OT=eta_polytropic_OT, eta_cstar=eta_cstar, eta_cf=eta_cf, Ps_Pt_OT=Ps_Pt_OT,
-                         dP_over_Pinj_CC=dP_over_Pinj_CC, dP_over_Pinj_OPB=dP_over_Pinj_OPB,
-                         CR_OPB=CR_OPB, CR_CC=CR_CC, eps_CC=eps_CC, mdot_film_over_mdot_fuel=mdot_film_over_mdot_fuel,
-                         dP_cooling_channels=dP_cooling_channels,
-                         dT_cooling_channels=dT_cooling_channels,
-                         axial_velocity_OT=axial_velocity_OT)
+                         dP_over_Pinj_CC=dP_over_Pinj_CC, dP_over_Pinj_OPB=dP_over_Pinj_OPB, CR_OPB=CR_OPB, CR_CC=CR_CC,
+                         eps_CC=eps_CC, mdot_film_over_mdot_fuel=mdot_film_over_mdot_fuel,
+                         dP_cooling_channels=dP_cooling_channels, dT_cooling_channels=dT_cooling_channels,
+                         axial_velocity_OT=axial_velocity_OT, include_film_in_cstar=include_film_in_cstar)
 
     def analyze_cycle(self, mdot_total, dP_OP, dP_FP, mdot_crossflow_fuel_over_mdot_fuel=None, T_OPB_required=None,
                       mdot_crossflow_fuel_over_mdot_fuel_bracket=(0.04, 0.11), mdot_crossflow_fuel_xtol=1e-3,
@@ -804,14 +803,14 @@ class ORSC_LRE(Cycle):
             mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_cooling_channels_outlet, oxidizer=self.OT_equilibrium_gas,
             fuel=self.heated_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
             eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
-            coolant_CEA_card=self.pumped_fuel.CEA_card)
+            coolant_CEA_card=self.pumped_fuel.CEA_card, include_film_in_cstar=self.include_film_in_cstar)
 
 
 class ClosedCatalyst_LRE(Cycle):
     def __init__(self, OF, oxidizer_rocket_cycle_fluid, fuel_rocket_cycle_fluid, eta_isotropic_OP, eta_isotropic_FP,
                  eta_polytropic_OT, eta_cstar, eta_cf, Ps_Pt_OT, dP_over_Pinj_CC, dP_over_Pinj_catalyst, CR_catalyst,
-                 CR_CC, eps_CC, mdot_film_over_mdot_oxid, dP_cooling_channels,
-                 dT_cooling_channels, axial_velocity_OT):
+                 CR_CC, eps_CC, mdot_film_over_mdot_oxid, dP_cooling_channels, dT_cooling_channels, axial_velocity_OT,
+                 include_film_in_cstar):
         """A class to analyse and size closed catalyst cycle.
 
         :param float or int OF: Oxidizer-to-Fuel ratio of the cycle
@@ -821,7 +820,7 @@ class ClosedCatalyst_LRE(Cycle):
         :param float or int eta_isotropic_FP: Isotropic efficiency of the fuel pump (-)
         :param float or int eta_polytropic_OT: Polytropic efficiency of the oxidizer turbine (-)
         :param float or int eta_cstar: C* efficiency of the CC (-)
-        :param float or int eta_cf: Cf efficiency of the CC (-)
+        :param float or int eta_cf: Cf efficiency of the CC (-) in vaccum
         :param float Ps_Pt_OT: Pressure recovery factor for oxidizer turbine. It is a ratio of static to total pressure
          recovered in diffuser and manifold after turbine (-)
         :param float or int dP_over_Pinj_catalyst: Total pressure drop ratio for the catalyst, across the injector and
@@ -843,7 +842,8 @@ class ClosedCatalyst_LRE(Cycle):
                          eta_cf=eta_cf, Ps_Pt_OT=Ps_Pt_OT, dP_over_Pinj_CC=dP_over_Pinj_CC, CR_catalyst=CR_catalyst,
                          CR_CC=CR_CC, eps_CC=eps_CC, mdot_film_over_mdot_oxid=mdot_film_over_mdot_oxid,
                          dP_cooling_channels=dP_cooling_channels, dP_over_Pinj_catalyst=dP_over_Pinj_catalyst,
-                         dT_cooling_channels=dT_cooling_channels, axial_velocity_OT=axial_velocity_OT)
+                         dT_cooling_channels=dT_cooling_channels, axial_velocity_OT=axial_velocity_OT,
+                         include_film_in_cstar=include_film_in_cstar)
 
     def analyze_cycle(self, mdot_total, dP_OP, dP_FP):
         """A function to analyze the cycle for given arguments.
@@ -921,7 +921,7 @@ class ClosedCatalyst_LRE(Cycle):
             mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_fuel, oxidizer=self.OT_equilibrium_gas,
             fuel=self.pumped_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
             eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
-            coolant_CEA_card=self.pumped_oxidizer.CEA_card)
+            coolant_CEA_card=self.pumped_oxidizer.CEA_card, include_film_in_cstar=self.include_film_in_cstar)
 
 
 class CycleSizing:

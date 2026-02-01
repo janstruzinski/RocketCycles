@@ -355,7 +355,8 @@ def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, press
 
 
 def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer, fuel, CC_pressure_at_injector, CR,
-                                             eps, eta_cstar, eta_cf, mdot_film=0, coolant_CEA_card=None):
+                                             eps, eta_cstar, eta_cf, mdot_film=0, coolant_CEA_card=None,
+                                             include_film_in_cstar=False):
     """A function to calculate the combustion chamber performance.
 
     :param float or int mdot_oxidizer: Oxidizer massflow (kg/s)
@@ -366,7 +367,7 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     :param float or int CR: CC contraction ratio
     :param float or int eps: CC expansion ratio
     :param float or int eta_cstar: C* efficiency (-)
-    :param float or int eta_cf: Cf efficiency at sea level (-)
+    :param float or int eta_cf: Cf efficiency in vacuum (-)
     :param float or int mdot_film: Film coolant massflow (kg/s)
     :param str coolant_CEA_card: Film coolant CEA card
 
@@ -377,35 +378,33 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     # Get total massflow and OF of the core flow (without film coolant)
     mdot_total = mdot_oxidizer + mdot_fuel + mdot_film  # kg / s
 
-    # In the analysis below, it is assumed film coolant eventually mixes with the combustion gases, and so is
-    # lumped together with reactants. However, it may be desirable to have the properties of the core flow
-    # (without film coolant) calculated and saved as well. Therefore, first analysis without film coolant is run.
-    # Create CEA object with Imperial units to be able to get full output.
+    # Get and save CEA analysis results for core flow only. Create CEA object with Imperial units to be able to get
+    # full output.
     rcea.add_new_fuel(name="fuel card w/o coolant", card_str=fuel.CEA_card)
     rcea.add_new_oxidizer(name="oxidizer card w/o coolant", card_str=oxidizer.CEA_card)
-    CC = rcea.CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", fac_CR=CR)
-    CC_core_CEA_output = CC.get_full_cea_output(Pc=CC_pressure_at_injector, MR=mdot_oxidizer / mdot_fuel, eps=eps,
-                                                pc_units="bar", output="si", short_output=1)
+    CC_core = rcea.CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", fac_CR=CR)
+    CC_core_CEA_output = CC_core.get_full_cea_output(Pc=CC_pressure_at_injector, MR=mdot_oxidizer / mdot_fuel, eps=eps,
+                                                     pc_units="bar", output="si", short_output=1)
     # Also get temperature of combustion. Input is given in Psia and output is in Rankine degrees, hence conversions
-    Tcomb = CC.get_Tcomb(Pc=CC_pressure_at_injector * 14.5038, MR=mdot_oxidizer / mdot_fuel) * 5 / 9
+    Tcomb = CC_core.get_Tcomb(Pc=CC_pressure_at_injector * 14.5038, MR=mdot_oxidizer / mdot_fuel) * 5 / 9
 
-    # If there is no film coolant, there will be no CEA results for mixed case.
+    # Calculate OF without film
+    OF_wo_film = mdot_oxidizer / mdot_fuel
+
+    # It may be beneficial to have CEA results for the case where core flow and film are lumped together (for example
+    # to assess impact of the film on the performance). Therefore, a mixed CEA case with core flow and film lumped
+    # together is also calculated.
+    # If there is no film coolant, there will be no CEA results for the mixed case.
     if mdot_film == 0 and coolant_CEA_card is None:
         CC_with_film_CEA_output = None
-        # Prepare CEA object for further calculations and get OF
-        CC = CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", isp_units='sec',
-                     cstar_units='m/s', pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
-                     enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
-                     viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
-        OF = mdot_oxidizer / mdot_fuel
 
-    # If there is film coolant, do analysis for it
+    # If there is film coolant, do analysis for the mixed case.
     elif mdot_film != 0 and coolant_CEA_card is not None:
         # Recognize whether fuel or oxygen is used for coolant and depending on the results, calculate total OF and add
         # cards to CEA.
         if "fuel" in coolant_CEA_card:
             # Calculate OF
-            OF = mdot_oxidizer / (mdot_fuel + mdot_film)
+            OF_w_film = mdot_oxidizer / (mdot_fuel + mdot_film)
             # Adjust weight fractions in CEA cards
             mdot_total_fuel = mdot_fuel + mdot_film
             fuel_CEA_card = modify_wt_percent(CEA_card=fuel.CEA_card,
@@ -419,7 +418,7 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
             rcea.add_new_oxidizer(name="oxidizer card", card_str=oxidizer.CEA_card)
         elif "oxid" in coolant_CEA_card:
             # Calculate OF
-            OF = (mdot_oxidizer + mdot_film) / mdot_fuel
+            OF_w_film = (mdot_oxidizer + mdot_film) / mdot_fuel
             # Adjust weight fractions in CEA cards
             mdot_total_ox = mdot_oxidizer + mdot_film
             ox_CEA_card = modify_wt_percent(CEA_card=oxidizer.CEA_card,
@@ -434,14 +433,27 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
 
         # Create CEA object with Imperial units to be able to get and save full output.
         CC_with_film = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
-        CC_with_film_CEA_output = CC_with_film.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF, eps=eps,
+        CC_with_film_CEA_output = CC_with_film.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF_w_film, eps=eps,
                                                                    pc_units="bar", output="si", short_output=1)
 
-        # Create CEA object with SI units for further calculations
+    # If there is no film or if there is film, but it is not included in performance calculations,
+    # core flow only will be used for them.
+    if mdot_film == 0 or not include_film_in_cstar:
+        # Create CEA object with SI units for further calculations and assign OF
+        CC = CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", isp_units='sec',
+                      cstar_units='m/s', pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
+                      enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
+                      viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
+        OF = OF_wo_film
+    # If there is film and if it is included in performance calculations, then core flow mixed with film will be used
+    # for them
+    elif mdot_film != 0 and include_film_in_cstar:
+        # Create CEA object with SI units for further calculations and assign OF
         CC = CEA_Obj(oxName="oxidizer card", fuelName="fuel card", isp_units='sec', cstar_units='m/s',
                      pressure_units='bar', temperature_units='K', sonic_velocity_units='m/s',
                      enthalpy_units='kJ/kg', density_units='kg/m^3', specific_heat_units='kJ/kg-K',
                      viscosity_units='millipoise', thermal_cond_units='W/cm-degC', fac_CR=CR)
+        OF = OF_w_film
 
     # Get ideal specific impulse, C* and CC plenum pressure
     (IspVac_ideal, Cstar) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)[0:2]
@@ -451,17 +463,21 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     A_t = Cstar * mdot_total * eta_cstar / (CC_plenum_pressure * 1e5)  # m^2
     A_e = A_t * eps  # m^2
 
-    # First get ideal Isp at the sea level
+    # Calculate thrust and real Isp in vacuum
+    IspVac_real = IspVac_ideal * eta_cf * eta_cstar
+    ThrustVac = IspVac_real * mdot_total * 9.80665
+
+    # Calculate how much Isp is lost. Approximately the same amount will be lost at the sea level
+    # (neglecting different nozzle phenomena like separation) as well.
+    Isp_losses = IspVac_ideal - IspVac_real
+
+    # Then calculate Isp at the sea level including separation
     IspSea_ideal, sea_level_operation_mode = CC.estimate_Ambient_Isp(Pc=CC_pressure_at_injector, MR=OF, eps=eps,
-                                                                     Pamb=1.01325)
-
-    # Now calculate real Isp and thrust at the seal level
-    IspSea_real = IspSea_ideal * eta_cf * eta_cstar  # s
-    ThrustSea = mdot_total * 9.80665 * IspSea_real  # N
-
-    # Then calculate thrust and real Isp in vacuum
-    ThrustVac = ThrustSea + 1.01325 * 1e5 * A_e
-    IspVac_real = ThrustVac / (mdot_total * 9.80665)
+                                                                    Pamb=1.01325)
+    # Subtract the loses
+    IspSea_real = IspSea_ideal - Isp_losses
+    # Calculate sea level thrust
+    ThrustSea = mdot_total * 9.80665 * IspSea_real
 
     return (CC_core_CEA_output, CC_with_film_CEA_output, CC_plenum_pressure, IspVac_real, IspSea_real, Tcomb,
             ThrustVac / 1e3, ThrustSea / 1e3, A_t, A_e, sea_level_operation_mode)

@@ -10,7 +10,7 @@ Raptor = RC.FFSC_LRE(OF=3.6, oxidizer_pyfluid=pyfluids.FluidsList.Oxygen, fuel_p
                      eta_cf=0.95, Ps_Pt_FT=0.95, Ps_Pt_OT=0.95, dP_over_Pinj_CC=0.1, dP_over_Pinj_OPB=0.1,
                      dP_over_Pinj_FPB=0.1, CR_CC=2.5, CR_FPB=4, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
                      dP_cooling_channels=190, dT_cooling_channels=100, axial_velocity_OT=200,
-                     axial_velocity_FT=300)
+                     axial_velocity_FT=300, include_film_in_cstar=False)
 Raptor.analyze_cycle(mdot_total=710, mdot_crossflow_fuel_over_mdot_fuel=0.045, dP_FP=880,
                      mdot_crossflow_ox_over_mdot_ox=0.075, dP_OP=690)
 print(Raptor.get_full_output())
@@ -34,7 +34,7 @@ orsc_engine = RC.ORSC_LRE(OF=3.6, oxidizer_pyfluid=pyfluids.FluidsList.Oxygen,
                           eta_polytropic_OT=0.9, eta_cstar=0.99, eta_cf=0.95, dP_over_Pinj_CC=0.1,
                           dP_over_Pinj_OPB=0.1, CR_CC=4, CR_OPB=4, eps_CC=35, mdot_film_over_mdot_fuel=0.05,
                           dP_cooling_channels=150, dT_cooling_channels=100,
-                          axial_velocity_OT=200)
+                          axial_velocity_OT=200, include_film_in_cstar=True)
 orsc_engine.analyze_cycle(mdot_total=710, dP_FP=520, dP_OP=700, mdot_crossflow_fuel_over_mdot_fuel=0.08)
 print(orsc_engine.get_full_output())
 
@@ -65,7 +65,7 @@ Draper = RC.ClosedCatalyst_LRE(OF=6.75, oxidizer_rocket_cycle_fluid=H2O2, fuel_r
                                eta_cf=0.95, Ps_Pt_OT=0.9, dP_over_Pinj_CC=0.15, dP_over_Pinj_catalyst=0.05, CR_CC=2.5,
                                CR_catalyst=4, eps_CC=35, mdot_film_over_mdot_oxid=0.02,
                                dP_cooling_channels=15, dT_cooling_channels=100,
-                               axial_velocity_OT=400)
+                               axial_velocity_OT=400, include_film_in_cstar=True)
 Draper.analyze_cycle(mdot_total=10, dP_FP=130, dP_OP=200)
 print(Draper.get_full_output())
 

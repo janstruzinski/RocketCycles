@@ -224,11 +224,12 @@ class TestRocketCycleElements(unittest.TestCase):
         CC_plenum_pressure = 300e5 / CC.get_Pinj_over_Pcomb(Pc=300, MR=4)  # Pa
         desired_A_t = (400 + 100) * C_star * 0.98 / CC_plenum_pressure
         desired_A_e = 100 * desired_A_t
+        desired_IspVac = IspVac * 0.98 * 0.95
+        desired_T_vac = desired_IspVac * (400 + 100) * 9.80665
+        Isp_losses = IspVac - desired_IspVac
         IspSea, mode = CC.estimate_Ambient_Isp(Pc=300, MR=4, eps=100, Pamb=1.01325)
-        desired_IspSea = IspSea * 0.98 * 0.95
+        desired_IspSea = IspSea - Isp_losses
         desired_T_sea = desired_IspSea * 9.80665 * (400 + 100)
-        desired_T_vac = desired_T_sea + desired_A_e * 1.01325e5
-        desired_IspVac = desired_T_vac / ((400 + 100) * 9.80665)
 
         # Get actual values
         (CC_output, dummy, CC_plenum_pressure, IspVac, IspSea, Tcomb, ThrustVac, ThrustSea, A_t, A_e,
