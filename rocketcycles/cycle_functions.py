@@ -65,7 +65,8 @@ def calculate_state_after_pump(fluid, delta_P, efficiency):
     fluid = RocketCycleFluid(species=fluid.species, mass_fractions=fluid.mass_fractions,
                              temperature=outlet_temperature, type=fluid.type, phase="liquid",
                              volumetric_expansion_coefficient=fluid.volumetric_expansion_coefficient,
-                             liquid_elasticity=fluid.liquid_elasticity, density=outlet_density)
+                             liquid_elasticity=fluid.liquid_elasticity, density=outlet_density,
+                             species_molar_Cp=fluid.species_molar_Cp)
     fluid.Pt = outlet_pressure / 1e5  # bar
     fluid.Ps = fluid.Pt  # bar
 
@@ -136,7 +137,7 @@ def calculate_state_after_preburner(preburner_inj_pressure, CR, fuel=None, oxidi
     elif monopropellant is not None:
         preburner = rcea.CEA_Obj(propName="monoprop card", fac_CR=CR)
     preburner_CEA_output = preburner.get_full_cea_output(MR=OF, Pc=preburner_inj_pressure, pc_units="bar", output="si",
-                                                         short_output=1)
+                                                         short_output=1, show_mass_frac=1)
     # To get sonic velocity and Mach number at the end of preburner, pressure in psia needs to be used, as SI Units
     # wrapper does not have these functions.
     a = preburner.get_SonicVelocities(Pc=preburner_inj_pressure * 14.5037738, MR=OF)[0] * 0.3048  # m/s
@@ -314,16 +315,26 @@ def calculate_state_after_cooling_channels_for_Pyfluids(fluid, mdot_coolant, mdo
     :param float or int pressure_drop: Pressure drop (in bar) across cooling channels
     :param float or int temperature_rise: Temperature rise (in K) across cooling channels
 
-    :return: Object representing outlet fluid, outlet massflow (in kg/s)
+    :return: Object representing outlet fluid, outlet massflow (in kg/s), heat flow picked up by the coolant (W)
     """
 
     # First calculate outlet massflow
     mdot_outlet = mdot_coolant - mdot_film  # kg / s
 
+    # Get enthalpy at the inlet
+    enthalpy_inlet = fluid.enthalpy # J / kg
+
     # For PyFluids' Fluid, object method can be used
     fluid = fluid.heating_to_temperature(temperature=fluid.temperature + temperature_rise,
                                          pressure_drop=pressure_drop * 1e5)
-    return fluid, mdot_outlet
+
+    # Get enthalpy at the outlet
+    enthalpy_outlet = fluid.enthalpy # J / kg
+
+    # Total heat flow picked up by the coolant
+    heat_coolant = (enthalpy_outlet - enthalpy_inlet) * mdot_outlet # W
+
+    return fluid, mdot_outlet, heat_coolant
 
 
 def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, pressure_drop,
@@ -336,11 +347,14 @@ def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, press
     :param float or int pressure_drop: Pressure drop (in bar) across cooling channels
     :param float or int temperature_rise: Temperature rise (in K) across cooling channels
 
-    :return: Object representing outlet fluid, outlet massflow (in kg/s)
+    :return: Object representing outlet fluid, outlet massflow (in kg/s), heat flow picked up by the coolant (W)
     """
 
     # First calculate outlet massflow
     mdot_outlet = mdot_coolant - mdot_film  # kg / s
+
+    # Get enthalpy at the inlet
+    enthalpy_inlet = (fluid.h0 / (fluid.MW * 1e-3)) * 1e3  # J / kg
 
     # Create a new object with new temperature and pressure.
     new_Ps = fluid.Ps - pressure_drop
@@ -351,12 +365,19 @@ def calculate_state_after_cooling_channels(fluid, mdot_coolant, mdot_film, press
     fluid.Ps = new_Ps  # bar
     # Dynamic head is small, so total pressure is the same as the static one
     fluid.Pt = new_Ps  # bar
-    return fluid, mdot_outlet
+
+    # Get enthalpy at the outlet
+    enthalpy_outlet = (fluid.h0 / (fluid.MW * 1e-3)) * 1e3 # J / kg
+
+    # Total heat flow picked up by the coolant
+    heat_coolant = (enthalpy_outlet - enthalpy_inlet) * mdot_outlet # W
+
+    return fluid, mdot_outlet, heat_coolant
 
 
 def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer, fuel, CC_pressure_at_injector, CR,
                                              eps, eta_cstar, eta_cf, mdot_film=0, coolant_CEA_card=None,
-                                             include_film_in_cstar=False):
+                                             include_film_in_cstar=False, heat_coolant=0):
     """A function to calculate the combustion chamber performance.
 
     :param float or int mdot_oxidizer: Oxidizer massflow (kg/s)
@@ -370,6 +391,13 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     :param float or int eta_cf: Cf efficiency in vacuum (-)
     :param float or int mdot_film: Film coolant massflow (kg/s)
     :param str coolant_CEA_card: Film coolant CEA card
+    :param boolean include_film_in_cstar: Boolean whether film is included in CEA calculations to get C* and Isp.
+     If True, eta_cstar should refer to real C* over CEA C* of core flow mixed with film.
+      eta_cf should refer to real Cf over CEA Cf of core flow mixed with film.
+     If False, eta_cstar should refer to real C* over CEA C* of core flow alone.
+      eta_cf should refer to real Cf over CEA Cf of core flow alone.
+    :param float or int heat_coolant: Heat flow picked up by the coolant from combustion gases. Enthalpy of the reactants
+     will be lowered by adequate enthalpy value calculated from heat_coolant to keep energy balance.
 
     :return: Full CEA output, CC plenum pressure, real vacuum and sea level specific impulse,
      ideal combustion temperature, real vacuum and sea level thrust, throat and exit areas
@@ -377,19 +405,38 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
 
     # Get total massflow and OF of the core flow (without film coolant)
     mdot_total = mdot_oxidizer + mdot_fuel + mdot_film  # kg / s
+    mdot_total_wo_film = mdot_oxidizer + mdot_fuel  # kg / s
+
+    # Calculate OF without film
+    OF_wo_film = mdot_oxidizer / mdot_fuel
+
+    # First calculate how much heat must be taken away from each reactant
+    heat_lost_ox = heat_coolant * OF_wo_film / (1 + OF_wo_film) # W
+    heat_lost_fuel = heat_coolant - heat_lost_ox # W
+
+    # Now calculate how much enthalpy must be removed. Get temperature change from it.
+    enthalpy_lost_ox = heat_lost_ox / mdot_oxidizer # J / kg
+    enthalpy_lost_fuel = heat_lost_fuel / mdot_fuel # J / kg
+    temperature_decrease_ox = enthalpy_lost_ox / oxidizer.mass_Cp_frozen # K
+    temperature_decrease_fuel = enthalpy_lost_fuel / fuel.mass_Cp_frozen # K
+
+    # Then modify propellant CEA cards
+    fuel = RocketCycleFluid(species=fuel.species, mass_fractions=fuel.mass_fractions,
+                            temperature=fuel.Ts - temperature_decrease_fuel, type=fuel.type, phase=fuel.phase,
+                            species_molar_Cp=fuel.species_molar_Cp)
+    oxidizer = RocketCycleFluid(species=oxidizer.species, mass_fractions=oxidizer.mass_fractions,
+                                temperature=oxidizer.Ts - temperature_decrease_ox, type=oxidizer.type,
+                                phase=oxidizer.phase, species_molar_Cp=oxidizer.species_molar_Cp)
 
     # Get and save CEA analysis results for core flow only. Create CEA object with Imperial units to be able to get
     # full output.
     rcea.add_new_fuel(name="fuel card w/o coolant", card_str=fuel.CEA_card)
     rcea.add_new_oxidizer(name="oxidizer card w/o coolant", card_str=oxidizer.CEA_card)
     CC_core = rcea.CEA_Obj(oxName="oxidizer card w/o coolant", fuelName="fuel card w/o coolant", fac_CR=CR)
-    CC_core_CEA_output = CC_core.get_full_cea_output(Pc=CC_pressure_at_injector, MR=mdot_oxidizer / mdot_fuel, eps=eps,
-                                                     pc_units="bar", output="si", short_output=1)
+    CC_core_CEA_output = CC_core.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF_wo_film, eps=eps,
+                                                     pc_units="bar", output="si", short_output=1, show_mass_frac=1)
     # Also get temperature of combustion. Input is given in Psia and output is in Rankine degrees, hence conversions
-    Tcomb = CC_core.get_Tcomb(Pc=CC_pressure_at_injector * 14.5038, MR=mdot_oxidizer / mdot_fuel) * 5 / 9
-
-    # Calculate OF without film
-    OF_wo_film = mdot_oxidizer / mdot_fuel
+    Tcomb = CC_core.get_Tcomb(Pc=CC_pressure_at_injector * 14.5038, MR=OF_wo_film) * 5 / 9
 
     # It may be beneficial to have CEA results for the case where core flow and film are lumped together (for example
     # to assess impact of the film on the performance). Therefore, a mixed CEA case with core flow and film lumped
@@ -434,7 +481,8 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
         # Create CEA object with Imperial units to be able to get and save full output.
         CC_with_film = rcea.CEA_Obj(oxName="oxidizer card", fuelName="fuel card", fac_CR=CR)
         CC_with_film_CEA_output = CC_with_film.get_full_cea_output(Pc=CC_pressure_at_injector, MR=OF_w_film, eps=eps,
-                                                                   pc_units="bar", output="si", short_output=1)
+                                                                   pc_units="bar", output="si", short_output=1,
+                                                                   show_mass_frac=1)
 
     # If there is no film or if there is film, but it is not included in performance calculations,
     # core flow only will be used for them.
@@ -459,6 +507,10 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     (IspVac_ideal, Cstar) = CC.get_IvacCstrTc(Pc=CC_pressure_at_injector, MR=OF, eps=eps)[0:2]
     CC_plenum_pressure = CC_pressure_at_injector / CC.get_Pinj_over_Pcomb(Pc=CC_pressure_at_injector, MR=OF)  # bar
 
+    # If film is not included in CEA calculations, IspVac must be decreased proportionally to its amount
+    if not include_film_in_cstar:
+        IspVac_ideal = IspVac_ideal * mdot_total_wo_film / mdot_total
+
     # Get throat and exit area
     A_t = Cstar * mdot_total * eta_cstar / (CC_plenum_pressure * 1e5)  # m^2
     A_e = A_t * eps  # m^2
@@ -474,6 +526,9 @@ def calculate_combustion_chamber_performance(mdot_oxidizer, mdot_fuel, oxidizer,
     # Then calculate Isp at the sea level including separation
     IspSea_ideal, sea_level_operation_mode = CC.estimate_Ambient_Isp(Pc=CC_pressure_at_injector, MR=OF, eps=eps,
                                                                     Pamb=1.01325)
+    # If film is not included in CEA calculations, IspSea must be decreased proportionally to its amount
+    if not include_film_in_cstar:
+        IspSea_ideal = IspSea_ideal * mdot_total_wo_film / mdot_total
     # Subtract the loses
     IspSea_real = IspSea_ideal - Isp_losses
     # Calculate sea level thrust

@@ -151,6 +151,7 @@ class Cycle:
         self.CR_CC = CR_CC
         self.eps_CC = eps_CC
         self.include_film_in_cstar = include_film_in_cstar
+        self.heat_coolant = None
 
     def get_full_output(self, get_CEA_inputs=False):
         """A function to return the string with data about the cycle.
@@ -390,6 +391,11 @@ class FFSC_LRE(Cycle):
         :param float or int dT_cooling_channels: Temperature rise in the cooling channels (K)
         :param float or int axial_velocity_OT: Axial velocity across oxidizer turbine (m/s)
         :param float or int axial_velocity_FT: Axial velocity across fuel turbine (m/s)
+        :param boolean include_film_in_cstar: Boolean whether film is included in CEA calculations to get C* and Isp.
+         If True, eta_cstar should refer to real C* over CEA C* of core flow mixed with film.
+          eta_cf should refer to real Cf over CEA Cf of core flow mixed with film.
+         If False, eta_cstar should refer to real C* over CEA C* of core flow alone.
+          eta_cf should refer to real Cf over CEA Cf of core flow alone.
         """
 
         # Parent class call
@@ -468,7 +474,7 @@ class FFSC_LRE(Cycle):
         # Calculate state after cooling channels and change both heated and pumped
         # fuel into RocketCycleFluid object. Pumped fuel will be still used later on for oxygen preburner,
         # hence it is changed to RocketCycleFluid.
-        self.heated_fuel, self.mdot_cooling_channels_outlet = (
+        self.heated_fuel, self.mdot_cooling_channels_outlet, self.heat_coolant = (
             cycle_functions.calculate_state_after_cooling_channels_for_Pyfluids(
                 fluid=self.pumped_fuel, mdot_coolant=self.mdot_fuel, mdot_film=self.mdot_film,
                 pressure_drop=self.dP_cooling_channels,
@@ -583,7 +589,8 @@ class FFSC_LRE(Cycle):
                 mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_FT, oxidizer=self.OT_equilibrium_gas,
                 fuel=self.FT_equilibrium_gas, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
                 eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
-                coolant_CEA_card=self.pumped_fuel.CEA_card, include_film_in_cstar=self.include_film_in_cstar)
+                coolant_CEA_card=self.pumped_fuel.CEA_card, include_film_in_cstar=self.include_film_in_cstar,
+                heat_coolant=self.heat_coolant)
 
 
 class ORSC_LRE(Cycle):
@@ -621,6 +628,11 @@ class ORSC_LRE(Cycle):
         :param float or int dP_cooling_channels: Pressure drop in the cooling channels (bar)
         :param float or int dT_cooling_channels: Temperature rise in the cooling channels (K)
         :param float or int axial_velocity_OT: Axial velocity across oxidizer turbine (m/s)
+        :param boolean include_film_in_cstar: Boolean whether film is included in CEA calculations to get C* and Isp.
+         If True, eta_cstar should refer to real C* over CEA C* of core flow mixed with film.
+          eta_cf should refer to real Cf over CEA Cf of core flow mixed with film.
+         If False, eta_cstar should refer to real C* over CEA C* of core flow alone.
+          eta_cf should refer to real Cf over CEA Cf of core flow alone.
         """
 
         # Parent class call
@@ -779,7 +791,7 @@ class ORSC_LRE(Cycle):
 
         # Calculate state after cooling channels and change heated fuel into RocketCycleFluid object.
         self.mdot_cooling_channels_inlet = self.mdot_fuel - self.mdot_crossflow_fuel
-        self.heated_fuel, self.mdot_cooling_channels_outlet = \
+        self.heated_fuel, self.mdot_cooling_channels_outlet, self.heat_coolant = \
             cycle_functions.calculate_state_after_cooling_channels_for_Pyfluids(
                 fluid=self.pumped_fuel, mdot_coolant=self.mdot_cooling_channels_inlet, mdot_film=self.mdot_film,
                 pressure_drop=self.dP_cooling_channels,
@@ -803,7 +815,8 @@ class ORSC_LRE(Cycle):
             mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_cooling_channels_outlet, oxidizer=self.OT_equilibrium_gas,
             fuel=self.heated_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
             eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
-            coolant_CEA_card=self.pumped_fuel.CEA_card, include_film_in_cstar=self.include_film_in_cstar)
+            coolant_CEA_card=self.pumped_fuel.CEA_card, include_film_in_cstar=self.include_film_in_cstar,
+            heat_coolant=self.heat_coolant)
 
 
 class ClosedCatalyst_LRE(Cycle):
@@ -835,6 +848,11 @@ class ClosedCatalyst_LRE(Cycle):
         :param float or int dP_cooling_channels: Pressure drop in the cooling channels (bar)
         :param float or int dT_cooling_channels: Temperature rise in the cooling channels (K)
         :param float or int axial_velocity_OT: Axial velocity across oxidizer turbine (m/s)
+        :param boolean include_film_in_cstar: Boolean whether film is included in CEA calculations to get C* and Isp.
+         If True, eta_cstar should refer to real C* over CEA C* of core flow mixed with film.
+          eta_cf should refer to real Cf over CEA Cf of core flow mixed with film.
+         If False, eta_cstar should refer to real C* over CEA C* of core flow alone.
+          eta_cf should refer to real Cf over CEA Cf of core flow alone.
         """
         super().__init__(name="CC", OF=OF, oxidizer_rocket_cycle_fluid=oxidizer_rocket_cycle_fluid,
                          fuel_rocket_cycle_fluid=fuel_rocket_cycle_fluid, eta_isotropic_OP=eta_isotropic_OP,
@@ -877,7 +895,7 @@ class ClosedCatalyst_LRE(Cycle):
         self.dT_OP = self.pumped_oxidizer.Ts - self.oxidizer.Ts
 
         # Calculate state after cooling channels.
-        self.heated_oxidizer, self.mdot_cooling_channels_outlet = \
+        self.heated_oxidizer, self.mdot_cooling_channels_outlet, self.heat_coolant = \
             cycle_functions.calculate_state_after_cooling_channels(
                 fluid=self.pumped_oxidizer, mdot_coolant=self.mdot_oxidizer, mdot_film=self.mdot_film,
                 pressure_drop=self.dP_cooling_channels,
@@ -921,7 +939,8 @@ class ClosedCatalyst_LRE(Cycle):
             mdot_oxidizer=self.mdot_OT, mdot_fuel=self.mdot_fuel, oxidizer=self.OT_equilibrium_gas,
             fuel=self.pumped_fuel, CC_pressure_at_injector=self.P_inj_CC, CR=self.CR_CC, eps=self.eps_CC,
             eta_cstar=self.eta_cstar, eta_cf=self.eta_cf, mdot_film=self.mdot_film,
-            coolant_CEA_card=self.pumped_oxidizer.CEA_card, include_film_in_cstar=self.include_film_in_cstar)
+            coolant_CEA_card=self.pumped_oxidizer.CEA_card, include_film_in_cstar=self.include_film_in_cstar,
+            heat_coolant=self.heat_coolant)
 
 
 class CycleSizing:

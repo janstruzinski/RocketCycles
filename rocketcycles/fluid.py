@@ -20,7 +20,8 @@ def pyfluid_to_rocket_cycle_fluid(fluid, CEA_name, type, phase):
     """
 
     propellant = RocketCycleFluid(species=[CEA_name], mass_fractions=[1], type=type,
-                                  temperature=fluid.temperature + 273.15, phase=phase)
+                                  temperature=fluid.temperature + 273.15, phase=phase,
+                                  species_molar_Cp = [fluid.specific_heat * fluid.molar_mass])
     propellant.Ps = fluid.pressure / 1e5
     # If phase is liquid, total pressure is the same as static pressure
     if phase == "liquid":
@@ -217,7 +218,7 @@ class RocketCycleFluid:
         """
 
         # Create lists to store the results
-        h0_list = []    # kJ / (mol * kg)
+        h0_list = []    # kJ / mol
         Cp_list = []    # J / (mol * K)
         MW_list = []    # g / mol
         CEA_card = ""
@@ -277,7 +278,7 @@ class RocketCycleFluid:
 
         # Calculate mixture thermal properties (ideal fluid assumption, frozen conditions)
         molar_Cp_mixture = np.sum(molar_fractions * Cp_array)    # J / (mol * K)
-        h0_mixture = np.sum(molar_fractions * h0_array)          # kJ / (mol * kg)
+        h0_mixture = np.sum(molar_fractions * h0_array)          # kJ / mol
         mass_Cp_mixture = (molar_Cp_mixture / (mixture_MW * 1e-3))   # J / (kg * K)
 
         # Return the results if mixture is not a gas
@@ -309,7 +310,8 @@ class RocketCycleFluid:
         # First create a CEA object with Imperial units, such that full output can be obtained
         rcea.add_new_propellant(name="equilibrium card", card_str=CEA_card)
         equilibrium = rcea.CEA_Obj(propName="equilibrium card")
-        equilibrium_CEA_output = equilibrium.get_full_cea_output(Pc=self.Ps, pc_units="bar", output="si", short_output=1)
+        equilibrium_CEA_output = equilibrium.get_full_cea_output(Pc=self.Ps, pc_units="bar", output="si",
+                                                                 short_output=1, show_mass_frac=1)
 
         # Now create a CEA object with SI units to get values expressed with them
         equilibrium = CEA_Obj(propName="equilibrium card", isp_units='sec', cstar_units='m/s',
