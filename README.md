@@ -40,12 +40,14 @@ For installation, first install nasaPoly from https://github.com/ptgodart/nasaPo
 
 To add JP-10 and RP-1, find raw.dat in nasaPoly installation directory and add the following data to other species:
 
+```text
 JP-10(L)          Exo-tetrahydrodicyclopentadiene. Smith,1979.
  0 g 6/01 C  10.00H  16.00    0.00    0.00    0.00 0   136.234040    -122800.400
     298.150      0.0000  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0            0.000
 RP-1              Mehta et.al. AIAA 95-2962 1995. Hcomb(high) = 19923.BTU/#
  0 gll/00 C   1.00H   1.95    0.00    0.00    0.00 1   13.9761830     -24717.700
     298.150      0.0000  0.0  0.0  0.0  0.0  0.0  0.0  0.0  0.0            0.000
+```
 
 To install RocketCycles, do:
 pip3 install git+https://github.com/janstruzinski/RocketCycles.git
@@ -168,7 +170,7 @@ models equate turbine shaft power directly to pump demand; a separate gearbox or
 ### Combustion Chamber
 
 `calculate_combustion_chamber_performance()` receives the core oxidizer and fuel streams, optional film flow, injector
-pressure, chamber contraction and nozzle expansion ratios, and $c^*$ and thrust-coefficient efficiencies. It always runs
+pressure, chamber contraction and nozzle expansion ratios, and $c^\ast$ and thrust-coefficient efficiencies. It always runs
 a core-flow RocketCEA case. If film cooling is present, it can also form a combined CEA reactant card by mass-weighting
 the coolant and same-side core stream; `include_film_in_cstar` chooses whether core-only or core-plus-film CEA results
 set performance.
@@ -185,11 +187,11 @@ injector-to-plenum pressure ratio and sea-level performance/separation mode. Cha
 the same finite-area-combustor pressure-ratio method as the preburner. If film is excluded from CEA performance, ideal
 specific impulse is diluted by the core-to-total mass-flow ratio. Throat and exit areas are
 
-$$A_t=\frac{c^*_{CEA}\dot m_{total}\eta_{c^*}}{P_{plenum}}, \qquad A_e=\varepsilon A_t.$$
+$$A_t=\frac{c^\ast_\mathrm{CEA}\dot m_\mathrm{total}\eta_{c^\ast}}{P_\mathrm{plenum}}, \qquad A_e=\varepsilon A_t.$$
 
 Real vacuum performance is calculated as
 
-$$I_{sp,vac}=I_{sp,vac,ideal}\eta_{c^*}\eta_{C_f}, \qquad F_{vac}=I_{sp,vac}\dot m_{total}g_0.$$
+$$I_{sp,vac}=I_{sp,vac,ideal}\eta_{c^\ast}\eta_{C_f}, \qquad F_{vac}=I_{sp,vac}\dot m_{total}g_0.$$
 
 The difference between ideal and real vacuum specific impulse is treated as an absolute loss and subtracted from
 RocketCEA's ideal sea-level specific impulse. Sea-level thrust is then $F_{sea}=I_{sp,sea}\dot m_{total}g_0$. This is a
