@@ -1,5 +1,3 @@
-import time
-
 from rocketcea.cea_obj_w_units import CEA_Obj
 import rocketcea.cea_obj as rcea
 import scipy.optimize as opt
