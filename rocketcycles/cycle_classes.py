@@ -167,9 +167,9 @@ class Cycle:
              f"Required CC plenum pressure: {self.P_plenum_CC_required} bar\n"
              f"---Propellants---\n"
              f"Fuel:"
-             f"{self.fuel_CEA_name}   Temperature: {self.T_fuel} K   Pressure: {self.P_fuel}\n"
+             f"{self.fuel_CEA_name}   Temperature: {self.T_fuel} K   Pressure: {self.P_fuel} bar\n"
              f"Oxidizer:"
-             f"{self.oxidizer_CEA_name}   Temperature: {self.T_oxidizer} K   Pressure: {self.P_oxidizer}\n"
+             f"{self.oxidizer_CEA_name}   Temperature: {self.T_oxidizer} K   Pressure: {self.P_oxidizer} bar\n"
              f"---Efficiencies---\n"
              f" - C* efficiency: {self.eta_cstar}   "
              f" - Cf efficiency: {self.eta_cf}\n"
@@ -861,7 +861,10 @@ class ClosedCatalyst_LRE(Cycle):
                          CR_CC=CR_CC, eps_CC=eps_CC, mdot_film_over_mdot_oxid=mdot_film_over_mdot_oxid,
                          dP_cooling_channels=dP_cooling_channels, dP_over_Pinj_catalyst=dP_over_Pinj_catalyst,
                          dT_cooling_channels=dT_cooling_channels, axial_velocity_OT=axial_velocity_OT,
-                         include_film_in_cstar=include_film_in_cstar)
+                         include_film_in_cstar=include_film_in_cstar, T_fuel=fuel_rocket_cycle_fluid.Ts,
+                         T_oxidizer=oxidizer_rocket_cycle_fluid.Ts, P_fuel=fuel_rocket_cycle_fluid.Ps,
+                         P_oxidizer=oxidizer_rocket_cycle_fluid.Ps, fuel_CEA_name=fuel_rocket_cycle_fluid.species,
+                         oxidizer_CEA_name=oxidizer_rocket_cycle_fluid.species)
 
     def analyze_cycle(self, mdot_total, dP_OP, dP_FP):
         """A function to analyze the cycle for given arguments.
